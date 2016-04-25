@@ -85,14 +85,6 @@ convert_direction(const char* direction)
 }
 
 // ==========================================================
-struct import_info {
-    const char* from;
-    const char* filename;
-    buffer_type statement;
-    const char* neededClass;
-    document_item_type* doc;
-    struct import_info* next;
-};
 
 document_item_type* g_document = NULL;
 import_info* g_imports = NULL;

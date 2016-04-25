@@ -52,7 +52,6 @@ typedef struct method_type {
     interface_item_type interface_item;
     type_type type;
     bool oneway;
-    bool oneway1;
     buffer_type oneway_token;
     buffer_type name;
     buffer_type open_paren_token;
@@ -79,6 +78,15 @@ typedef struct document_item_type {
     struct document_item_type* next;
 } document_item_type;
 
+struct import_info {
+    const char* from;
+    const char* filename;
+    buffer_type statement;
+    const char* neededClass;
+    document_item_type* doc;
+    struct import_info* next;
+};
+
 
 // for user_data_type.flattening_methods
 enum {
@@ -99,7 +107,6 @@ typedef struct interface_type {
     document_item_type document_item;
     buffer_type interface_token;
     bool oneway;
-    bool oneway1;
     buffer_type oneway_token;
     char* package;
     buffer_type name;

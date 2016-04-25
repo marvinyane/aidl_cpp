@@ -13,6 +13,8 @@
 
 using namespace std;
 
+extern import_info* g_imports;
+
 typedef struct {
     const char *name;
     const char *decl;
@@ -41,7 +43,7 @@ static TYPEMAP* lookup_type(const char *name)
         //{"IBinderThreadPriorityService", "const sp<IBinderThreadPriorityService>&", "sp<IBinderThreadPriorityService>", "sp<IBinderThreadPriorityService>&",
             //"%s = data.readIBinderThreadPriorityService();\n", "_data.writeIBinderThreadPriorityService(%s);\n"},
         //{"WorkSource", "WorkSource", "WorkSource", "WorkSource&", "%s = data.readInt32();\n", "_data.writeInt32(0);\n"},
-        {"float", "float", "float", "float&" "%s = reply.readFloat();\n", "_data.writeFloat(%s);\n"},
+        {"float", "float", "float", "float&", "%s = reply.readFloat();\n", "_data.writeFloat(%s);\n"},
         {0, 0, 0, 0, 0, 0}};
 
     static TYPEMAP pattern =
@@ -106,7 +108,34 @@ static string makelow(const char *name)
     return transactCodeName;
 }
 
-static void make_method_name(FILE* outputfd, method_type* method, char* class_name)
+static void make_imports(FILE* outputfd)
+{
+    import_info* imports = g_imports;
+
+    while (imports)
+    {
+        char header_name[100];
+        bzero(header_name, sizeof header_name);
+        int i = 0;
+        for (; i < strlen(imports->neededClass); i++)
+        {
+            if (imports->neededClass[i] == '.')
+            {
+                header_name[i] = '/';
+            }
+            else
+            {
+                header_name[i] = imports->neededClass[i];
+            }
+        }
+
+        fprintf(outputfd, "#include \"%s.h\"\n", header_name);
+
+        imports = imports->next;
+    }
+}
+
+static void make_method_name(FILE* outputfd, method_type* method, char* class_name, bool notify_res = false)
 {
     int i = 0;
     string transactCodeName = makeup(method->name.data);
@@ -119,14 +148,22 @@ static void make_method_name(FILE* outputfd, method_type* method, char* class_na
     //fprintf(outputfd, "    virtual ");
 
     if (return_void)
-        fprintf(outputfd, "status_t");
+        fprintf(outputfd, "android::status_t");
     else
         fprintf(outputfd, "%s%s", lookup_type(method->type.type.data)->decl, dimstr.c_str());
 
+    char method_name[100];
+    bzero(method_name, sizeof method_name);
+    strcpy(method_name, method->name.data);
+    if (notify_res)
+    {
+        strcat(method_name, "_res");
+    }
+
     if (class_name)
-        fprintf(outputfd, " %s::%s(", class_name, method->name.data);
+        fprintf(outputfd, " %s::%s(", class_name, method_name);
     else
-        fprintf(outputfd, " %s(", method->name.data);
+        fprintf(outputfd, " %s(", method_name);
 
     arg_type* arg = method->args;
 
@@ -135,7 +172,21 @@ static void make_method_name(FILE* outputfd, method_type* method, char* class_na
     {
         int dir = convert_direction(arg->direction.data);
 
-        if (method->oneway && dir != OUT_PARAMETER)
+        if (!notify_res && method->oneway && dir != OUT_PARAMETER)
+        {
+            if (first_arg)
+            {
+                first_arg = false;
+            }
+            else
+            {
+                fprintf(outputfd, ", ");
+            }
+
+            fprintf(outputfd, "%s %s", lookup_type(arg->type.type.data)->declparam, arg->name.data);
+        }
+
+        if (notify_res && method->oneway && dir != IN_PARAMETER)
         {
             if (first_arg)
             {
@@ -232,6 +283,89 @@ static void make_enum_code(FILE* outputfd, interface_item_type* aitem)
     fprintf(outputfd, "\t\tNOTIFY_MAX\n\t};\n\n");
 }
 
+static void generate_replier_source_file(FILE* outputfd, interface_item_type* aitem)
+{
+    char class_name[100];
+    bzero(class_name, sizeof(class_name));
+    sprintf(class_name, "%sReplier", this_interface);
+    
+    fprintf(outputfd, "#include \"%s.h\"\n", class_name);
+    fprintf(outputfd, "#include \"binder/Parcel.h\"\n");
+    fprintf(outputfd, "#include \"%sService.h\"\n", this_interface);
+    fprintf(outputfd, "#include \"%sStubBase.h\"\n\n", this_interface);
+    make_imports(outputfd);
+    fprintf(outputfd, "namespace goni {\n\n");
+
+    fprintf(outputfd, "%s::%s(%sService* owner)\n\t:m_owner(owner)\n{\n}\n", class_name, class_name, this_interface);
+    fprintf(outputfd, "%s::~%s() {}\n\n", class_name, class_name);
+
+    interface_item_type* item = aitem;
+    while (item)
+    {
+        if (item->item_type == METHOD_TYPE) {
+            method_type* method =  (method_type*)item;
+            if (method->oneway)
+            {
+                make_method_name(outputfd, method, class_name, true);
+                fprintf(outputfd, "\n{\n");
+                fprintf(outputfd, "\tandroid::Parcel _data;\n");
+                
+                arg_type* arg = method->args;
+                while (arg)
+                {
+                    if (convert_direction(arg->direction.data) != IN_PARAMETER)
+                    {
+                        TYPEMAP* tm = lookup_type(arg->type.type.data);
+                        fprintf(outputfd, "\t");
+                        fprintf(outputfd, tm->to, arg->name.data);
+                    }
+                    arg = arg->next;
+                }
+
+                fprintf(outputfd, "\n");
+                fprintf(outputfd, "\tm_owner->sendAsyncRes(%sStubBase::NOTIFY_%s, _data);\n\treturn 0;\n}\n", this_interface, makeup(method->name.data).c_str());
+            }
+        }
+        item = item->next;
+    }
+
+    fprintf(outputfd, "}\n/* EOF */");
+
+}
+
+static void generate_replier_header_file(FILE* outputfd, interface_item_type* aitem)
+{
+    char class_name[100];
+    bzero(class_name, sizeof(class_name));
+    sprintf(class_name, "%sReplier", this_interface);
+    
+    fprintf(outputfd, "#ifndef __%s_H__\n"\
+            "#define __%s_H__\n\n", makeup(class_name).c_str(), makeup(class_name).c_str());
+    
+    fprintf(outputfd, "#include \"StubBase.h\"\n");
+    make_imports(outputfd);
+
+    fprintf(outputfd, "namespace goni {\n\n");
+    fprintf(outputfd, "class %sService;\n\n", this_interface);
+    fprintf(outputfd, "class %s\n{\npublic:\n\t%s(%sService* owner);\n\t~%s();\n\n", class_name, class_name, this_interface, class_name);
+
+    interface_item_type* item = aitem;
+    while (item)
+    {
+        if (item->item_type == METHOD_TYPE) {
+            method_type* method =  (method_type*)item;
+            if (method->oneway)
+            {
+                fprintf(outputfd, "\t");
+                make_method_name(outputfd, method, NULL, true);
+                fprintf(outputfd, ";\n");
+            }
+        }
+        item = item->next;
+    }
+
+    fprintf(outputfd, "\nprivate:\n\t%sService* m_owner;\n};\n}\n#endif\n/* EOF */", this_interface);
+}
 
 static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem)
 {
@@ -239,13 +373,14 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
     bzero(class_name, sizeof(class_name));
     sprintf(class_name, "%sStubBase", this_interface);
 
-    fprintf(outputfd, "#include \"%s.h\"", class_name);
+    fprintf(outputfd, "#include \"%s.h\"\n", class_name);
     fprintf(outputfd, "#include \"binder/Parcel.h\"\n\n");
+    make_imports(outputfd);
     fprintf(outputfd, "namespace goni {\n\n");
 
     fprintf(outputfd, "%s::%s() {}\n\n%s::~%s() {}\n\n", class_name, class_name, class_name, class_name);
 
-    fprintf(outputfd, "int %s::onSyncRequest(unsigned int code, const android::Parcel &data, android::Parcel& _data)\n{\n", class_name);
+    fprintf(outputfd, "int %s::onSyncRequest(unsigned int code, const android::Parcel &reply, android::Parcel& _data)\n{\n", class_name);
     fprintf(outputfd, "\tswitch (code) {\n");
 
     interface_item_type* item = aitem;
@@ -311,8 +446,10 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
 
         item = item->next;
     }
+
+    fprintf(outputfd, "\t}\n\n\treturn 0;\n}\n");
     
-    fprintf(outputfd, "int %s::onAsyncRequest(unsigned int code, const android::Parcel &reply)\n{\n", class_name);
+    fprintf(outputfd, "int %s::onAsyncRequest(SenderId &id, unsigned int code, const android::Parcel &reply)\n{\n", class_name);
     fprintf(outputfd, "\tswitch (code) {\n");
 
     item = aitem;
@@ -326,10 +463,13 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
                 arg_type* arg = method->args;
                 while (arg)
                 {
-                    TYPEMAP* tm = lookup_type(arg->type.type.data);
-                    fprintf(outputfd, "\t\t%s ", tm->decl);
-                    fprintf(outputfd, tm->from, arg->name.data);
+                    if (convert_direction(arg->direction.data) != OUT_PARAMETER) 
+                    {
+                        TYPEMAP* tm = lookup_type(arg->type.type.data);
+                        fprintf(outputfd, "\t\t%s ", tm->decl);
+                        fprintf(outputfd, tm->from, arg->name.data);
 
+                    }
                     arg = arg->next;
                 }
 
@@ -338,14 +478,17 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
                 bool first_arg = true;
                 while (arg)
                 {
-                    if (first_arg)
+                    if (convert_direction(arg->direction.data) != OUT_PARAMETER) 
                     {
-                        fprintf(outputfd, "%s", arg->name.data);
-                        first_arg = false;
-                    }
-                    else
-                    {
-                        fprintf(outputfd, ", %s", arg->name.data);
+                        if (first_arg)
+                        {
+                            fprintf(outputfd, "%s", arg->name.data);
+                            first_arg = false;
+                        }
+                        else
+                        {
+                            fprintf(outputfd, ", %s", arg->name.data);
+                        }
                     }
                     arg = arg->next;
                 }
@@ -358,7 +501,7 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
         item = item->next;
     }
 
-    fprintf(outputfd, "\treturn 0;\n}");
+    fprintf(outputfd, "\t}\n\n\treturn 0;\n}\n}\n/* EOF */");
 }
 
 static void generate_stub_header_file(FILE* outputfd, interface_item_type* aitem)
@@ -372,7 +515,11 @@ static void generate_stub_header_file(FILE* outputfd, interface_item_type* aitem
             "#include \"StubBase.h\"\n" \
             "#include \"binder/Parcel.h\"\n" \
             "#include \"servicebase/ServiceBaseDefines.h\"\n\n" \
-            "namespace goni {\n\n", makeup(class_name).c_str(), makeup(class_name).c_str());
+            , makeup(class_name).c_str(), makeup(class_name).c_str());
+            
+    make_imports(outputfd);
+
+    fprintf(outputfd, "namespace goni {\n\n");
 
     fprintf(outputfd, "class %s : public StubBase\n{\npublic:\n", class_name);
     fprintf(outputfd, "\t%s();\n\tvirtual ~%s();\n\n", class_name, class_name);
@@ -398,7 +545,7 @@ static void generate_stub_header_file(FILE* outputfd, interface_item_type* aitem
         item = item->next;
     }
 
-    fprintf(outputfd, "};\n}\n/* EOF */");
+    fprintf(outputfd, "};\n}\n#endif\n/* EOF */");
 }
 
 static void generate_proxy_source_file(FILE *outputfd, interface_item_type* aitem)
@@ -410,6 +557,7 @@ static void generate_proxy_source_file(FILE *outputfd, interface_item_type* aite
 
     fprintf(outputfd, "#include \"%s.h\"\n", class_name);
     fprintf(outputfd, "#include \"binder/Parcel.h\"\n\n");
+    make_imports(outputfd);
     fprintf(outputfd, "namespace goni {\n\n");
     fprintf(outputfd, "%s::%s(%sProxyReplier* replier)\n\t:ServiceProxyBase(\"%s\")\n\t,m_replier(replier)\n{\n",
             class_name, class_name, this_proxy_interface, this_interface);
@@ -538,9 +686,9 @@ static void generate_proxy_header_file(FILE *outputfd, interface_item_type* aite
     //fprintf(outputfd, "#include <utils/Errors.h>\n");
     fprintf(outputfd, "#include\"servicebase/ServiceProxyBase.h\"\n");
     fprintf(outputfd, "#include \"servicebase/ServiceBaseDefines.h\"\n\n");
+    make_imports(outputfd);
 
     fprintf(outputfd, "namespace goni {\n\n");
-    fprintf(outputfd, "typedef int status_t;");
     fprintf(outputfd, "class %sProxyReplier\n{\npublic:\n", this_proxy_interface);
     fprintf(outputfd, "\tvirtual ~%sProxyReplier() {}\n\n", this_proxy_interface);
 
@@ -558,7 +706,7 @@ static void generate_proxy_header_file(FILE *outputfd, interface_item_type* aite
                     dimstr += "[]";
                 fprintf(outputfd, "    virtual ");
                 if (return_void)
-                    fprintf(outputfd, "status_t");
+                    fprintf(outputfd, "android::status_t");
                 else
                     fprintf(outputfd, "%s%s", lookup_type(method->type.type.data)->decl, dimstr.c_str());
                 fprintf(outputfd, " %s(", method->name.data);
@@ -622,6 +770,7 @@ static void generate_header_file(FILE *outputfd, interface_item_type* aitem)
     //fprintf(outputfd, "#include <utils/Errors.h>\n");
     fprintf(outputfd, "#include\"servicebase/ServiceProxyBase.h\"\n");
     fprintf(outputfd, "#include \"servicebase/ServiceBaseDefines.h\"\n\n");
+    make_imports(outputfd);
 
     fprintf(outputfd, "namespace goni {\n\n");
     fprintf(outputfd, "class %sProxy : public ServiceProxyBase\n{\npublic:\n", this_proxy_interface);
@@ -640,7 +789,7 @@ static void generate_header_file(FILE *outputfd, interface_item_type* aitem)
                     dimstr += "[]";
                 fprintf(outputfd, "    virtual ");
                 if (return_void)
-                    fprintf(outputfd, "status_t");
+                    fprintf(outputfd, "android::status_t");
                 else
                     fprintf(outputfd, "%s%s", lookup_type(method->type.type.data)->decl, dimstr.c_str());
                 fprintf(outputfd, " %s(", method->name.data);
@@ -689,6 +838,7 @@ static void generate_implementation(FILE *outputfd, interface_item_type* aitem)
     //fprintf(outputfd, "#include <sys/types.h>\n");
     fprintf(outputfd, "#include <binder/Parcel.h>\n");
     fprintf(outputfd, "#include <%s/%s.h>\n\n", makelow(this_interface).c_str(), this_proxy_interface);
+    make_imports(outputfd);
     fprintf(outputfd, "namespace goni {\n\n");
     //fprintf(outputfd, "class Bp%s : public BpInterface<%s>\n{\n",
     //this_interface, this_proxy_interface);
@@ -711,7 +861,7 @@ static void generate_implementation(FILE *outputfd, interface_item_type* aitem)
                 fprintf(outputfd, "%s\n", gather_comments(method->comments_token->extra).c_str());
                 fprintf(outputfd, "virtual ");
                 if (return_void)
-                    fprintf(outputfd, "status_t");
+                    fprintf(outputfd, "android::status_t");
                 else
                     fprintf(outputfd, "%s%s", lookup_type(method->type.type.data)->decl, dimstr.c_str());
                 fprintf(outputfd, " %sProxy::%s(",this_interface, method->name.data);
@@ -898,6 +1048,17 @@ generate_cpp(const string& filename, const string& originalSrc, interface_type* 
 
     outputfd = newfile(filebuff, file_name, ".cpp", originalSrc);
     generate_stub_source_file(outputfd, iface->interface_items);
+    fclose(outputfd);
+
+    sprintf(tmp_file_name, "%sReplier", this_interface);
+    file_name = std::string(tmp_file_name, strlen(tmp_file_name));
+
+    outputfd = newfile(filebuff, file_name, ".h", originalSrc);
+    generate_replier_header_file(outputfd, iface->interface_items);
+    fclose(outputfd);
+    
+    outputfd = newfile(filebuff, file_name, ".cpp", originalSrc);
+    generate_replier_source_file(outputfd, iface->interface_items);
     fclose(outputfd);
 
     return 0;
