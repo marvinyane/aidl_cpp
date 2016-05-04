@@ -26,6 +26,7 @@ static int count_brackets(const char*);
 %token INOUT
 %token ONEWAY
 %token MULTICAST
+%token STRUCT
 
 %%
 document:
@@ -212,6 +213,18 @@ interface_items:
                                                             $$.interface_item = (interface_item_type*)$2.multicast;
                                                         }
                                                     }
+    |   interface_items struct_decl                 {
+                                                        interface_item_type* p=$1.interface_item;
+                                                        while (p && p->next) {
+                                                            p=p->next;
+                                                        }
+                                                        if (p) {
+                                                            p->next = (interface_item_type*)$2.multicast;
+                                                            $$ = $1;
+                                                        } else {
+                                                            $$.interface_item = (interface_item_type*)$2.multicast;
+                                                        }
+                                                    }
     |   interface_items command_decl               {
                                                         interface_item_type* p=$1.interface_item;
                                                         while (p && p->next) {
@@ -232,6 +245,21 @@ interface_items:
                                                         $$ = $1;
                                                     }
     ;
+
+struct_decl:
+           STRUCT '{' params_list '}' IDENTIFIER ';' {
+                                                        multicast_type *method = (multicast_type*)malloc(sizeof(multicast_type));
+                                                        method->interface_item.item_type = MULTICAST_TYPE;
+                                                        method->interface_item.next = NULL;
+                                                        method->name = $5.buffer;
+                                                        method->open_paren_token = $2.buffer;
+                                                        method->args = $3.arg;
+                                                        method->close_paren_token = $4.buffer;
+                                                        method->semicolon_token = $6.buffer;
+                                                        $$.multicast = method;
+                                                    }
+        ;
+
 
 command_decl:
         direction IDENTIFIER '(' arg_list ')' ';' {
@@ -293,6 +321,26 @@ method_decl:
                                                         method->comments_token = &method->oneway_token;
                                                         $$.method = method;
                                                     }
+    ;
+
+params_list:
+    arg ';'                     {   $$ = $1; }
+    |   params_list arg ';'     {
+                                    if ($$.arg != NULL) {
+                                        // only NULL on error
+                                        $$ = $1;
+                                        arg_type *p = $1.arg;
+                                        while (p && p->next) {
+                                            p=p->next;
+                                        }
+                                        $2.arg->comma_token = $3.buffer;
+                                        p->next = $2.arg;
+                                    }
+                                }
+    |   error                   {
+                                    fprintf(stderr, "%s:%d: syntax error in parameter list\n", g_currentFilename, $1.buffer.lineno);
+                                    $$.arg = NULL;
+                                }
     ;
 
 arg_list:

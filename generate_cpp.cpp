@@ -10,7 +10,6 @@
 #include <libgen.h>
 #include <sys/stat.h>
 #include "aidl_language.h"
-#include "generate_java.h" // for gather_comments()
 
 using namespace std;
 
@@ -28,11 +27,29 @@ typedef struct {
 static const char *this_proxy_interface;
 static const char *this_interface;
 
+string
+gather_comments(extra_text_type* extra)
+{
+    string s;
+    while (extra) {
+        if (extra->which == SHORT_COMMENT) {
+            s += extra->data;
+        }
+        else if (extra->which == LONG_COMMENT) {
+            s += "/*";
+            s += extra->data;
+            s += "*/";
+        }
+        extra = extra->next;
+    }
+    return s;
+}
+
 static TYPEMAP* lookup_type(const char *name)
 {
     static TYPEMAP typemap[] = {
         {"int", "int", "int", "int&", "%s = %sreadInt32();\n", "%swriteInt32(%s);\n"},
-        {"long", "long", "long", "long&", "%s = %sreadInt64();\n", "%swriteInt64(%s);\n"},
+        {"int64", "int64_t", "int64_t", "int64_t&", "%s = %sreadInt64();\n", "%swriteInt64(%s);\n"},
         {"byte", "char", "char", "char&", "%s = %sreadByte();\n", "%swriteByte(%s);\n"},
         {"boolean", "bool", "bool", "bool&", "%s = %sreadInt32();\n", "%swriteInt32((int)%s);\n"},
         {"String", "android::String16", "const android::String16&", "android::String16&", "%s = %sreadString16();\n", "%swriteString16(%s);\n"},

@@ -1,3 +1,0 @@
-
-package import;
-parcelable AString;

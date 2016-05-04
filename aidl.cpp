@@ -3,7 +3,6 @@
 #include "options.h"
 #include "search_path.h"
 #include "Type.h"
-#include "generate_java.h"
 #include "generate_cpp.h"
 #include <unistd.h>
 #include <fcntl.h>
@@ -965,11 +964,7 @@ compile_aidl(Options& options)
     // make sure the folders of the output file all exists
     check_outputFilePath(options.outputFileName);
 
-    if (generate_cpp_files)
-        err = generate_cpp(options.outputFileName, options.inputFileName.c_str(),
-                        (interface_type*)mainDoc);
-    else
-        err = generate_java(options.outputFileName, options.inputFileName.c_str(),
+    err = generate_cpp(options.outputFileName, options.inputFileName.c_str(),
                         (interface_type*)mainDoc);
 
     return err;
