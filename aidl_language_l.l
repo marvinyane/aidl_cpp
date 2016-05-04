@@ -88,6 +88,7 @@ in              { SET_BUFFER(IN); return IN; }
 out             { SET_BUFFER(OUT); return OUT; }
 inout           { SET_BUFFER(INOUT); return INOUT; }
 oneway          { SET_BUFFER(ONEWAY); return ONEWAY; }
+multicast       { SET_BUFFER(MULTICAST); return MULTICAST; }
 
 {brackets}+     { SET_BUFFER(ARRAY); return ARRAY; }
 

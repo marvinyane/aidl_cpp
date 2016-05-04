@@ -40,7 +40,9 @@ typedef struct arg_type {
 } arg_type;
 
 enum {
-    METHOD_TYPE
+    METHOD_TYPE,
+    COMMAND_TYPE,
+    MULTICAST_TYPE
 };
 
 typedef struct interface_item_type {
@@ -61,6 +63,27 @@ typedef struct method_type {
     buffer_type semicolon_token;
     buffer_type* comments_token; // points into this structure, DO NOT DELETE
 } method_type;
+
+typedef struct command_type {
+    interface_item_type interface_item;
+    buffer_type name;
+    buffer_type open_paren_token;
+    arg_type* args;
+    buffer_type close_paren_token;
+    // XXX missing comments/copy text here
+    buffer_type semicolon_token;
+    buffer_type direction;
+} commmand_type;
+
+typedef struct multicast_type {
+    interface_item_type interface_item;
+    buffer_type name;
+    buffer_type open_paren_token;
+    arg_type* args;
+    buffer_type close_paren_token;
+    // XXX missing comments/copy text here
+    buffer_type semicolon_token;
+} multicast_type;
 
 enum language_t {
 	JAVA = 0,	
@@ -121,6 +144,8 @@ typedef union lexer_type {
     type_type type;
     arg_type *arg;
     method_type* method;
+    multicast_type* multicast;
+    command_type* command;
     interface_item_type* interface_item;
     interface_type* interface_obj;
     user_data_type* user_data;

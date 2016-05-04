@@ -723,7 +723,7 @@ generate_outputFileName(const Options& options, const document_item_type* items)
 
 
 // ==========================================================
-static void
+void
 check_outputFilePath(const string& path) {
     size_t len = path.length();
     for (size_t i=0; i<len ; i++) {

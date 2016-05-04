@@ -25,6 +25,7 @@ static int count_brackets(const char*);
 %token OUT
 %token INOUT
 %token ONEWAY
+%token MULTICAST
 
 %%
 document:
@@ -199,12 +200,67 @@ interface_items:
                                                             $$.interface_item = (interface_item_type*)$2.method;
                                                         }
                                                     }
+    |   interface_items multicast_decl              {
+                                                        interface_item_type* p=$1.interface_item;
+                                                        while (p && p->next) {
+                                                            p=p->next;
+                                                        }
+                                                        if (p) {
+                                                            p->next = (interface_item_type*)$2.multicast;
+                                                            $$ = $1;
+                                                        } else {
+                                                            $$.interface_item = (interface_item_type*)$2.multicast;
+                                                        }
+                                                    }
+    |   interface_items command_decl               {
+                                                        interface_item_type* p=$1.interface_item;
+                                                        while (p && p->next) {
+                                                            p=p->next;
+                                                        }
+                                                        if (p) {
+                                                            p->next = (interface_item_type*)$2.command;
+                                                            $$ = $1;
+                                                        } else {
+                                                            $$.interface_item = (interface_item_type*)$2.command;
+                                                        }
+                                                    }
+
+
     |   interface_items error ';'                   {
                                                         fprintf(stderr, "%s:%d: syntax error before ';' (expected method declaration)\n",
                                                                     g_currentFilename, $3.buffer.lineno);
                                                         $$ = $1;
                                                     }
     ;
+
+command_decl:
+        direction IDENTIFIER '(' arg_list ')' ';' {
+                                                        command_type *method = (command_type*)malloc(sizeof(command_type));
+                                                        method->interface_item.item_type = COMMAND_TYPE;
+                                                        method->interface_item.next = NULL;
+                                                        method->name = $2.buffer;
+                                                        method->open_paren_token = $3.buffer;
+                                                        method->args = $4.arg;
+                                                        method->close_paren_token = $5.buffer;
+                                                        method->semicolon_token = $6.buffer;
+                                                        method->direction = $1.buffer;
+                                                        $$.command = method;
+                                                    }
+    ;
+
+multicast_decl:
+        MULTICAST IDENTIFIER '(' arg_list ')' ';'  {
+                                                        multicast_type *method = (multicast_type*)malloc(sizeof(multicast_type));
+                                                        method->interface_item.item_type = MULTICAST_TYPE;
+                                                        method->interface_item.next = NULL;
+                                                        method->name = $2.buffer;
+                                                        method->open_paren_token = $3.buffer;
+                                                        method->args = $4.arg;
+                                                        method->close_paren_token = $5.buffer;
+                                                        method->semicolon_token = $6.buffer;
+                                                        $$.multicast = method;
+                                                    }
+        ;
 
 method_decl:
         type IDENTIFIER '(' arg_list ')' ';'  {
