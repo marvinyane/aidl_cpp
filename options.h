@@ -9,7 +9,6 @@ using namespace std;
 
 enum {
     COMPILE_AIDL,
-    PREPROCESS_AIDL
 };
 
 // This struct is the parsed version of the command line options
@@ -17,15 +16,8 @@ struct Options
 {
     int task;
     bool failOnParcelable;
-    vector<string> importPaths;
-    vector<string> preprocessedFiles;
     string inputFileName;
-    string outputFileName;
     string outputBaseFolder;
-    string depFileName;
-    bool autoDepFile;
-
-    vector<string> filesToPreprocess;
 };
 
 // takes the inputs from the command line and fills in the Options struct

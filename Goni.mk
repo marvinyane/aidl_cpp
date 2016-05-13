@@ -12,14 +12,10 @@ LOCAL_SRC_FILES := \
 	aidl_language_y.y \
 	aidl_language_l.l \
 	aidl.cpp \
-	aidl_language.cpp \
 	options.cpp \
-	search_path.cpp \
-	AST.cpp \
-	Type.cpp \
 	generate_cpp.cpp \
 
-LOCAL_CFLAGS := -g
+LOCAL_CFLAGS := -g -std=gnu++0x
 LOCAL_MODULE := aidl
 LOCAL_MODULE_TAGS := optional
 

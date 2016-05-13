@@ -73,16 +73,19 @@ typedef struct command_type {
     // XXX missing comments/copy text here
     buffer_type semicolon_token;
     buffer_type direction;
+    buffer_type* comments_token; // points into this structure, DO NOT DELETE
 } commmand_type;
 
 typedef struct multicast_type {
     interface_item_type interface_item;
+    buffer_type sign;
     buffer_type name;
     buffer_type open_paren_token;
     arg_type* args;
     buffer_type close_paren_token;
     // XXX missing comments/copy text here
     buffer_type semicolon_token;
+    buffer_type* comments_token; // points into this structure, DO NOT DELETE
 } multicast_type;
 
 enum language_t {
@@ -93,7 +96,6 @@ enum language_t {
 enum {
     USER_DATA_TYPE = 12,
     INTERFACE_TYPE_BINDER,
-    INTERFACE_TYPE_RPC
 };
 
 typedef struct document_item_type {
@@ -122,6 +124,7 @@ typedef struct user_data_type {
     buffer_type keyword_token; // only the first one
     char* package;
     buffer_type name;
+    arg_type* args;
     buffer_type semicolon_token;
     int flattening_methods;
 } user_data_type;
@@ -191,6 +194,8 @@ extern char const* g_currentFilename;
 
 // the package name for our current file
 extern char const* g_currentPackage;
+
+extern document_item_type* g_document;
 
 typedef enum {
     STATEMENT_INSIDE_INTERFACE

@@ -1,7 +1,6 @@
 %{
 #include "aidl_language.h"
 #include "aidl_language_y.h"
-#include "search_path.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -54,15 +53,7 @@ brackets    \[{whitespace}?\]
 <LONG_COMMENT>\n                { append_extra_text(yytext); }
 <LONG_COMMENT>\**\/             { BEGIN(INITIAL); }
 
-^{whitespace}?import{whitespace}[^ \t\r\n]+{whitespace}?;  {
-                                                SET_BUFFER(IMPORT);
-                                                return IMPORT;
-                                            }
-^{whitespace}?package{whitespace}[^ \t\r\n]+{whitespace}?;  {
-                                                do_package_statement(yytext);
-                                                SET_BUFFER(PACKAGE);
-                                                return PACKAGE;
-                                            }
+
 <<EOF>>             { yyterminate(); }
 
 \/\/.*\n            { begin_extra_text(yylineno, SHORT_COMMENT);
@@ -168,14 +159,6 @@ void drop_extra_text(void)
     g_nextExtraText = NULL;
 }
 
-
-// package handling
-// ================================================
-void do_package_statement(const char* importText)
-{
-    if (g_currentPackage) free((void*)g_currentPackage);
-    g_currentPackage = parse_import_statement(importText);
-}
 
 
 // main parse function

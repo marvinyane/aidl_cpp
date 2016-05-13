@@ -12,8 +12,6 @@ static int count_brackets(const char*);
 
 %}
 
-%token IMPORT
-%token PACKAGE
 %token IDENTIFIER
 %token GENERIC
 %token ARRAY
@@ -30,24 +28,10 @@ static int count_brackets(const char*);
 
 %%
 document:
-        document_items                          { g_callbacks->document($1.document_item); }
-    |   headers document_items                  { g_callbacks->document($2.document_item); }
+        document_items                          { g_document = $1.document_item; }
     ;
 
-headers:
-        package                                 { }
-    |   imports                                 { }
-    |   package imports                         { }
-    ;
 
-package:
-        PACKAGE                                 { }
-    ;
-
-imports:
-        IMPORT                                  { g_callbacks->import(&($1.buffer)); }
-    |   IMPORT imports                          { g_callbacks->import(&($1.buffer)); }
-    ;
 
 document_items:
                                                 { $$.document_item = NULL; }
@@ -102,26 +86,17 @@ parcelable_decl:
                                                                      g_currentFilename, $2.buffer.lineno, $2.buffer.data);
                                                         $$.user_data = NULL;
                                                     }
-    |   FLATTENABLE IDENTIFIER ';'                  {
+    |  PARCELABLE IDENTIFIER '{' params_list '}' ';'{
                                                         user_data_type* b = (user_data_type*)malloc(sizeof(user_data_type));
                                                         b->document_item.item_type = USER_DATA_TYPE;
                                                         b->document_item.next = NULL;
                                                         b->keyword_token = $1.buffer;
                                                         b->name = $2.buffer;
                                                         b->package = g_currentPackage ? strdup(g_currentPackage) : NULL;
-                                                        b->semicolon_token = $3.buffer;
-                                                        b->flattening_methods = PARCELABLE_DATA | RPC_DATA;
+                                                        b->args = $4.arg;
+                                                        b->semicolon_token = $6.buffer;
+                                                        b->flattening_methods = PARCELABLE_DATA;
                                                         $$.user_data = b;
-                                                    }
-    |   FLATTENABLE ';'                             {
-                                                        fprintf(stderr, "%s:%d syntax error in flattenable declaration. Expected type name.\n",
-                                                                     g_currentFilename, $1.buffer.lineno);
-                                                        $$.user_data = NULL;
-                                                    }
-    |   FLATTENABLE error ';'                       {
-                                                        fprintf(stderr, "%s:%d syntax error in flattenable declaration. Expected type name, saw \"%s\".\n",
-                                                                     g_currentFilename, $2.buffer.lineno, $2.buffer.data);
-                                                        $$.user_data = NULL;
                                                     }
 
     ;
@@ -137,35 +112,14 @@ interface_header:
                                                         c->comments_token = &c->interface_token;
                                                         $$.interface_obj = c;
                                                    }
-    |   ONEWAY INTERFACE                           {
-                                                        interface_type* c = (interface_type*)malloc(sizeof(interface_type));
-                                                        c->document_item.item_type = INTERFACE_TYPE_BINDER;
-                                                        c->document_item.next = NULL;
-                                                        c->interface_token = $2.buffer;
-                                                        c->oneway = true;
-                                                        c->oneway_token = $1.buffer;
-                                                        c->comments_token = &c->oneway_token;
-                                                        $$.interface_obj = c;
-                                                   }
-    |   RPC                                        {
-                                                        interface_type* c = (interface_type*)malloc(sizeof(interface_type));
-                                                        c->document_item.item_type = INTERFACE_TYPE_RPC;
-                                                        c->document_item.next = NULL;
-                                                        c->interface_token = $1.buffer;
-                                                        c->oneway = false;
-                                                        memset(&c->oneway_token, 0, sizeof(buffer_type));
-                                                        c->comments_token = &c->interface_token;
-                                                        $$.interface_obj = c;
-                                                   }
     ;
 
 interface_keywords:
         INTERFACE
-    |   RPC
     ;
 
 interface_decl:
-        interface_header IDENTIFIER '{' interface_items '}' { 
+        interface_header IDENTIFIER '{' interface_items '}' {
                                                         interface_type* c = $1.interface_obj;
                                                         c->name = $2.buffer;
                                                         c->package = g_currentPackage ? strdup(g_currentPackage) : NULL;
@@ -272,6 +226,7 @@ command_decl:
                                                         method->close_paren_token = $5.buffer;
                                                         method->semicolon_token = $6.buffer;
                                                         method->direction = $1.buffer;
+                                                        method->comments_token = &method->direction;
                                                         $$.command = method;
                                                     }
     ;
@@ -281,11 +236,13 @@ multicast_decl:
                                                         multicast_type *method = (multicast_type*)malloc(sizeof(multicast_type));
                                                         method->interface_item.item_type = MULTICAST_TYPE;
                                                         method->interface_item.next = NULL;
+                                                        method->sign = $1.buffer;
                                                         method->name = $2.buffer;
                                                         method->open_paren_token = $3.buffer;
                                                         method->args = $4.arg;
                                                         method->close_paren_token = $5.buffer;
                                                         method->semicolon_token = $6.buffer;
+                                                        method->comments_token = &method->sign;
                                                         $$.multicast = method;
                                                     }
         ;
