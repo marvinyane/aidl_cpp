@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "aidl_language.h"
+
 class BasicType
 {
 public:
@@ -40,7 +42,7 @@ public:
 
         std::string tab;
         for (int i = 0; i < tab_size; i++)
-            tab.push_back('\t');
+            tab.append("    ");
 
         ret.append(tab);
         bool new_line = false;
@@ -48,15 +50,15 @@ public:
         {
             ret.push_back(_f[i]);
             if (_f[i] == '{')
-                tab.push_back('\t');
+                tab.append("    ");
             if (_f[i] == '}')
-                tab.erase(0, 1);
+                tab.erase(0, 4);
 
             if (_f[i] == '\n' && i != _f.size() - 1)
             {
                 if (_f[i+1] == '}')
                 {
-                    tab.erase(0, 1);
+                    tab.erase(0, 4);
                     ret.append(tab);
                     ret.push_back('}');
                     i++;
@@ -95,9 +97,9 @@ public:
         tmp.append(m_type);
         tmp.append("& get");
         tmp.append(upFirst(m_name));
-        tmp.append("() { return ");
+        tmp.append("()\n{\nreturn ");
         tmp.append(m_name);
-        tmp.append("; }\n");
+        tmp.append(";\n}\n");
 
         tmp.append("void set");
         tmp.append(upFirst(m_name));
@@ -106,11 +108,11 @@ public:
         tmp.append(m_type);
         tmp.append("& _");
         tmp.append(m_name);
-        tmp.append(") {");
+        tmp.append(")\n{\n");
         tmp.append(m_name);
         tmp.append(" = _");
         tmp.append(m_name);
-        tmp.append("; }\n\n");
+        tmp.append(";\n}\n");
 
         return format(tmp, tab_size);
     }
@@ -157,7 +159,7 @@ public:
         tmp.append(m_type);
         tmp.append("& ");
         tmp.append(m_name);
-        tmp.append(" ");
+        //tmp.append(" ");
 
 
         return tmp;
@@ -174,7 +176,7 @@ public:
         tmp.append(m_type);
         tmp.append("& ");
         tmp.append(m_name);
-        tmp.append(" ");
+        //tmp.append(" ");
 
         return tmp;
     }
@@ -275,15 +277,15 @@ class ByteType : public BasicType
 {
 public:
     ByteType(std::string name, bool isArray = false)
-        : BasicType(name, "char", isArray)
+        : BasicType(name, "int8_t", isArray)
     {
-        m_readParcel = std::string("readByte");
-        m_writeParcel = std::string("writeByte");
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
     }
 
     static std::string name()
     {
-        return "byte";
+        return "int8";
     }
 
     ~ByteType() {}
@@ -294,7 +296,7 @@ class ShortType : public BasicType
 {
 public:
     ShortType(std::string name, bool isArray = false)
-        : BasicType(name, "int", isArray)
+        : BasicType(name, "int16_t", isArray)
     {
         m_readParcel = std::string("readInt32");
         m_writeParcel = std::string("writeInt32");
@@ -302,7 +304,7 @@ public:
 
     static std::string name()
     {
-        return "short";
+        return "int16";
     }
 
     ~ShortType() {}
@@ -313,7 +315,7 @@ class IntType : public BasicType
 {
 public:
     IntType(std::string name, bool isArray = false)
-        : BasicType(name, "int", isArray)
+        : BasicType(name, "int32_t", isArray)
     {
         m_readParcel = std::string("readInt32");
         m_writeParcel = std::string("writeInt32");
@@ -331,7 +333,7 @@ class Int64Type : public BasicType
 {
 public:
     Int64Type(std::string name, bool isArray = false)
-        : BasicType(name, "int64", isArray)
+        : BasicType(name, "int64_t", isArray)
     {
         m_readParcel = std::string("readInt64");
         m_writeParcel = std::string("writeInt64");
@@ -417,6 +419,53 @@ public:
     }
 };
 
+class EnumType : public BasicType
+{
+public:
+    EnumType(std::string sign, std::string name)
+    : BasicType(name, std::string("enum ").append(sign), false)
+    {
+    }
+    ~EnumType()
+    {
+    }
+
+    virtual std::string from(int tab_size, bool decl = true)
+    {
+        std::string tmp;
+        if (decl)
+        {
+            tmp.append(m_type);
+            tmp.append(" ");
+        }
+        tmp.append(m_name);
+        tmp.append(" = static_cast<");
+        tmp.append(m_type);
+        tmp.append(">(data.");
+        tmp.append(m_readParcel);
+        tmp.append("());\n");
+        return format(tmp, tab_size);
+    }
+    
+    virtual std::string to(int tab_size, bool decl = false)
+    {
+        std::string tmp;
+        if (decl)
+        {
+            tmp.append(m_type);
+            tmp.append(" ");
+        }
+        tmp.append("_data.");
+        tmp.append(m_writeParcel);
+        tmp.append("(static_cast<");
+        tmp.append(m_type);
+        tmp.append(">(");
+        tmp.append(m_name);
+        tmp.append("));\n");
+        return format(tmp, tab_size);
+    }
+};
+
 class UserType : public BasicType
 {
 public:
@@ -480,9 +529,9 @@ public:
 
         tmp.append("& get");
         tmp.append(upFirst(m_name));
-        tmp.append("() { return ");
+        tmp.append("()\n{\nreturn ");
         tmp.append(m_name);
-        tmp.append("; }\n");
+        tmp.append(";\n}\n");
         
         tmp.append("void set");
         tmp.append(upFirst(m_name));
@@ -494,11 +543,11 @@ public:
             tmp.append(m_spName);
         tmp.append("& _");
         tmp.append(m_name);
-        tmp.append(") {");
+        tmp.append(")\n{\n");
         tmp.append(m_name);
         tmp.append(" = _");
         tmp.append(m_name);
-        tmp.append("; }\n\n");
+        tmp.append(";\n}\n");
 
         return format(tmp, tab_size);
     }
@@ -570,7 +619,7 @@ public:
         }
         tmp.append("& ");
         tmp.append(m_name);
-        tmp.append(" ");
+        //tmp.append(" ");
 
         return tmp;
     }
@@ -589,7 +638,7 @@ public:
             tmp.append(m_spName);
         }
         tmp.append(m_name);
-        tmp.append(" ");
+        //tmp.append(" ");
         return tmp;
     }
 
@@ -617,7 +666,7 @@ public:
             m_array = false;
             tmp.append(declare("_tmp"));
             m_array = true;
-            tmp.append(" _tmp->readFromParcel(data);\n");
+            tmp.append("_tmp->readFromParcel(data);\n");
             tmp.append(m_name);
             tmp.append(".push_back(_tmp);\n}\n}\n");
         }
@@ -674,7 +723,7 @@ private:
 class BasicTypeFactory
 {
 public:
-    static BasicType* create_type(const char* name, const char* type, bool isArray = false)
+    BasicType* create_type(const char* name, const char* type, bool isArray)
     {
         if (!ByteType::name().compare(type)) {
             return new ByteType(name, isArray);
@@ -702,9 +751,48 @@ public:
         }
         else
         {
-            return new UserType(type, name, isArray);
+            if (std::find(m_users.begin(), m_users.end(), type) != m_users.end())
+            {
+                return new UserType(type, name, isArray);
+            }
+            else if (std::find(m_enums.begin(), m_enums.end(), type) != m_enums.end())
+            {
+                return new EnumType(type, name);
+            }
+            else
+            {
+                printf("->>>>>>>>>>>>>>>> Unknown sign %s\n", type);
+            }
         }
     }
+
+    enum 
+    {
+        USER_DATA,
+        ENUM_DATA
+    };
+
+    void set_user_data(std::string name, int type)
+    {
+        if (type == USER_DATA)
+        {
+            if (std::find(m_users.begin(), m_users.end(), name) == m_users.end())
+            {
+                m_users.push_back(name);
+            }
+        }
+        else
+        {
+            if (std::find(m_enums.begin(), m_enums.end(), name) == m_enums.end())
+            {
+                m_enums.push_back(name);
+            }
+        }
+    }
+
+private:
+    std::vector<std::string> m_users;
+    std::vector<std::string> m_enums;
 };
 
 

@@ -25,6 +25,13 @@ typedef struct buffer_type {
     extra_text_type* extra;
 } buffer_type;
 
+typedef struct enum_list
+{
+    buffer_type comma_token;
+    buffer_type buffer;
+    struct enum_list* next;
+};
+
 typedef struct type_type {
     buffer_type type;
     buffer_type array_token;
@@ -80,6 +87,7 @@ typedef struct multicast_type {
     interface_item_type interface_item;
     buffer_type sign;
     buffer_type name;
+    buffer_type domain;
     buffer_type open_paren_token;
     arg_type* args;
     buffer_type close_paren_token;
@@ -96,6 +104,7 @@ enum language_t {
 enum {
     USER_DATA_TYPE = 12,
     INTERFACE_TYPE_BINDER,
+    ENUM_DATA_TYPE,
 };
 
 typedef struct document_item_type {
@@ -129,6 +138,18 @@ typedef struct user_data_type {
     int flattening_methods;
 } user_data_type;
 
+typedef struct enum_data_type {
+    document_item_type document_item;
+    buffer_type sign;
+    buffer_type name;
+    buffer_type open_paren_token;
+    enum_list*  enumm_list;
+    buffer_type close_paren_token;
+    buffer_type semicolon_token;
+    buffer_type* comments_token; // points into this structure, DO NOT DELETE
+} enum_data_type;
+
+
 typedef struct interface_type {
     document_item_type document_item;
     buffer_type interface_token;
@@ -149,6 +170,8 @@ typedef union lexer_type {
     method_type* method;
     multicast_type* multicast;
     command_type* command;
+    enum_data_type* enum_item;
+    enum_list* enumm_list;
     interface_item_type* interface_item;
     interface_type* interface_obj;
     user_data_type* user_data;

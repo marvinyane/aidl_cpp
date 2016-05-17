@@ -81,6 +81,7 @@ inout           { SET_BUFFER(INOUT); return INOUT; }
 oneway          { SET_BUFFER(ONEWAY); return ONEWAY; }
 multicast       { SET_BUFFER(MULTICAST); return MULTICAST; }
 struct          { SET_BUFFER(STRUCT); return STRUCT; }
+enum            { SET_BUFFER(ENUM); return ENUM; }
 
 {brackets}+     { SET_BUFFER(ARRAY); return ARRAY; }
 

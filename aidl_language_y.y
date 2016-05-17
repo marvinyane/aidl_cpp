@@ -25,6 +25,7 @@ static int count_brackets(const char*);
 %token ONEWAY
 %token MULTICAST
 %token STRUCT
+%token ENUM
 
 %%
 document:
@@ -62,6 +63,7 @@ document_items:
 declaration:
         parcelable_decl                            { $$.document_item = (document_item_type*)$1.user_data; }
     |   interface_decl                             { $$.document_item = (document_item_type*)$1.interface_item; }
+    |   enum_decl                                  { $$.document_item = (document_item_type*)$1.enum_item; }
     ;
 
 parcelable_decl:
@@ -167,18 +169,6 @@ interface_items:
                                                             $$.interface_item = (interface_item_type*)$2.multicast;
                                                         }
                                                     }
-    |   interface_items struct_decl                 {
-                                                        interface_item_type* p=$1.interface_item;
-                                                        while (p && p->next) {
-                                                            p=p->next;
-                                                        }
-                                                        if (p) {
-                                                            p->next = (interface_item_type*)$2.multicast;
-                                                            $$ = $1;
-                                                        } else {
-                                                            $$.interface_item = (interface_item_type*)$2.multicast;
-                                                        }
-                                                    }
     |   interface_items command_decl               {
                                                         interface_item_type* p=$1.interface_item;
                                                         while (p && p->next) {
@@ -191,8 +181,6 @@ interface_items:
                                                             $$.interface_item = (interface_item_type*)$2.command;
                                                         }
                                                     }
-
-
     |   interface_items error ';'                   {
                                                         fprintf(stderr, "%s:%d: syntax error before ';' (expected method declaration)\n",
                                                                     g_currentFilename, $3.buffer.lineno);
@@ -200,20 +188,48 @@ interface_items:
                                                     }
     ;
 
-struct_decl:
-           STRUCT '{' params_list '}' IDENTIFIER ';' {
-                                                        multicast_type *method = (multicast_type*)malloc(sizeof(multicast_type));
-                                                        method->interface_item.item_type = MULTICAST_TYPE;
-                                                        method->interface_item.next = NULL;
-                                                        method->name = $5.buffer;
-                                                        method->open_paren_token = $2.buffer;
-                                                        method->args = $3.arg;
-                                                        method->close_paren_token = $4.buffer;
+enum_decl:
+           ENUM IDENTIFIER '{' enum_list '}' ';' {
+                                                        enum_data_type *method = (enum_data_type*)malloc(sizeof(enum_data_type));
+                                                        method->document_item.item_type = ENUM_DATA_TYPE;
+                                                        method->document_item.next = NULL;
+                                                        method->sign = $1.buffer;
+                                                        method->name = $2.buffer;
+                                                        method->open_paren_token = $3.buffer;
+                                                        method->enumm_list = $4.enumm_list;
+                                                        method->close_paren_token = $5.buffer;
                                                         method->semicolon_token = $6.buffer;
-                                                        $$.multicast = method;
+                                                        method->comments_token = &method->sign;
+                                                        $$.enum_item= method;
                                                     }
         ;
 
+enum_list:
+        IDENTIFIER                                  {
+                                                        enum_list* enums =  (enum_list*)malloc(sizeof(enum_list));
+                                                        memset(&enums->comma_token, 0, sizeof(buffer_type));
+                                                        enums->buffer = $1.buffer;
+                                                        enums->next = NULL;
+                                                        $$.enumm_list = enums;
+                                                    }
+    |   enum_list ',' IDENTIFIER                    {
+                                                        if ($$.enumm_list != NULL) {
+                                                            enum_list* enums =  (enum_list*)malloc(sizeof(enum_list));
+                                                            memset(&enums->comma_token, 0, sizeof(buffer_type));
+                                                            enums->buffer = $3.buffer;
+                                                            enums->next = NULL;
+                                                            enum_list *p = $1.enumm_list;
+                                                            while (p && p->next) {
+                                                                p=p->next;
+                                                            }
+                                                            p->next = enums;
+                                                        }
+                                                    }
+    |   error                   {
+                                    fprintf(stderr, "%s:%d: syntax error in enum list\n", g_currentFilename, $1.buffer.lineno);
+                                    $$.arg = NULL;
+                                }
+    ;
 
 command_decl:
         direction IDENTIFIER '(' arg_list ')' ';' {
@@ -232,11 +248,26 @@ command_decl:
     ;
 
 multicast_decl:
-        MULTICAST IDENTIFIER '(' arg_list ')' ';'  {
+        MULTICAST IDENTIFIER IDENTIFIER '(' arg_list ')' ';'  {
                                                         multicast_type *method = (multicast_type*)malloc(sizeof(multicast_type));
                                                         method->interface_item.item_type = MULTICAST_TYPE;
                                                         method->interface_item.next = NULL;
                                                         method->sign = $1.buffer;
+                                                        method->domain = $2.buffer;
+                                                        method->name = $3.buffer;
+                                                        method->open_paren_token = $4.buffer;
+                                                        method->args = $5.arg;
+                                                        method->close_paren_token = $6.buffer;
+                                                        method->semicolon_token = $7.buffer;
+                                                        method->comments_token = &method->sign;
+                                                        $$.multicast = method;
+                                                    }
+    | MULTICAST IDENTIFIER '(' arg_list ')' ';'  {
+                                                        multicast_type *method = (multicast_type*)malloc(sizeof(multicast_type));
+                                                        method->interface_item.item_type = MULTICAST_TYPE;
+                                                        method->interface_item.next = NULL;
+                                                        method->sign = $1.buffer;
+                                                        method->domain = $1.buffer;
                                                         method->name = $2.buffer;
                                                         method->open_paren_token = $3.buffer;
                                                         method->args = $4.arg;
