@@ -482,7 +482,6 @@ static void generate_enum_define(std::string include_str, document_item_type* ai
 
     fprintf(outputfd, "\n}/*namespace goni*/\n#endif\n/* EOF */");
 
-
     fclose(outputfd);
 }
 
@@ -1042,6 +1041,7 @@ static void generate_user_data(user_data_type* p, const string& inc_str)
     fprintf(outputfd, "#define __%s_H__\n\n", makeup(p->name.data).c_str());
     fprintf(outputfd, "#include <vector>\n");
     fprintf(outputfd, "#include \"servicebase/ServiceBaseGlobal.h\"\n");
+    fprintf(outputfd, "#include \"%sServiceDefines.h\"\n", this_interface);
     fprintf(outputfd, "%s\n", inc_buf);
     fprintf(outputfd, "namespace goni {\n");
     fprintf(outputfd, "class %s : public android::RefBase\n{\n", p->name.data);
@@ -1119,6 +1119,20 @@ void init_user_data(document_item_type* docus)
 
 }
 
+void init_interface_name(document_item_type* docus)
+{
+    while (docus)
+    {
+        if (docus->item_type == INTERFACE_TYPE_BINDER) {
+            interface_type* iface = (interface_type*)docus;
+            this_proxy_interface = iface->name.data;
+            this_interface = &this_proxy_interface[1];
+        }
+
+        docus = docus->next;
+    }
+}
+
 // =================================================
 int
 generate_cpp(const string& filename, const string& originalSrc, document_item_type* docus)
@@ -1148,6 +1162,8 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
     }
 
     init_user_data(docus);
+
+    init_interface_name(docus);
 
     document_item_type* docus_bak = docus;
 
@@ -1232,6 +1248,8 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
 
         docus = docus->next;
     }
+
+    docus = docus_bak;
     
     generate_enum_define(include_str, docus_bak, originalSrc);
 

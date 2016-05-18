@@ -423,7 +423,7 @@ class EnumType : public BasicType
 {
 public:
     EnumType(std::string sign, std::string name)
-    : BasicType(name, std::string("enum ").append(sign), false)
+    : BasicType(name, sign, false)
     {
     }
     ~EnumType()
