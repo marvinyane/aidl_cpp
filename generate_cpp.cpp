@@ -36,7 +36,7 @@ static BasicTypeFactory bt_factory;
 static FILE *newfile(const char *filebuff, const string& filename, const char *suffix, const string& originalSrc);
 
 string
-gather_comments(extra_text_type* extra)
+gather_comments(extra_text_type* extra, bool tab = true)
 {
     string s;
     while (extra) {
@@ -55,7 +55,7 @@ gather_comments(extra_text_type* extra)
         s.append("\n");
     }
 
-    if (s.empty())
+    if (s.empty() || !tab)
         return s;
 
     std::string tmp("    ");
@@ -90,6 +90,11 @@ escape_backslashes(const string& str)
 
 static string makefirstup(const std::string name)
 {
+    if (name.empty())
+    {
+        return name;
+    }
+
     std::string tmp(name);
     if (islower(name[0]))
     {
@@ -352,10 +357,13 @@ static void generate_sub_source_file(FILE* outputfd, interface_item_type* aitem,
 {
     char class_name[100];
     bzero(class_name, sizeof(class_name));
-    sprintf(class_name, "%sSub%s", this_interface, makefirstup(domain).c_str());
+    if (domain.compare("multicast"))
+        sprintf(class_name, "%sSub%s", this_interface, makefirstup(domain).c_str());
+    else
+        sprintf(class_name, "%sSub", this_interface);
 
     fprintf(outputfd, 
-    "#include \"%s.h\"\n"\
+    "#include \"sub/%s.h\"\n"\
     "#include \"servicebase/ServiceBase.h\"\n"\
     "namespace goni {\n\n"\
     "%s::%s(I%s *replier, ServiceBase* owner)\n"
@@ -363,7 +371,7 @@ static void generate_sub_source_file(FILE* outputfd, interface_item_type* aitem,
     "    , m_replier(replier)\n"\
     "{\n}\n\n"\
     "%s::~%s()\n{\n}\n\n",
-    class_name, class_name, class_name, class_name, this_interface, this_interface, class_name, class_name);
+    class_name, class_name, class_name, class_name, this_interface, domain.c_str(), class_name, class_name);
  
 
     fprintf(outputfd, "int %s::onMulticast(unsigned int code, const android::Parcel &data)\n{\n    switch(code) {\n", class_name);
@@ -375,7 +383,7 @@ static void generate_sub_source_file(FILE* outputfd, interface_item_type* aitem,
         {
             multicast_type* method =  (multicast_type*)item;
 
-            if (!domain.compare(method->domain.data) || ((!domain.compare("")) && (!strcmp(method->domain.data, "multicast"))))
+            if (!domain.compare(method->domain.data)) 
             {
                 fprintf(outputfd, "    case MULTICAST_%s:\n    {\n", makeup(method->name.data).c_str());
 
@@ -406,7 +414,10 @@ static void generate_sub_header_file(FILE* outputfd, interface_item_type* aitem,
 {
     char class_name[100];
     bzero(class_name, sizeof(class_name));
-    sprintf(class_name, "%sSub%s", this_interface, makefirstup(domain).c_str());
+    if (domain.compare("multicast"))
+        sprintf(class_name, "%sSub%s", this_interface, makefirstup(domain).c_str());
+    else
+        sprintf(class_name, "%sSub", this_interface);
     
     fprintf(outputfd, "#ifndef __%s_H__\n"\
             "#define __%s_H__\n\n", makeup(class_name).c_str(), makeup(class_name).c_str());
@@ -428,7 +439,7 @@ static void generate_sub_header_file(FILE* outputfd, interface_item_type* aitem,
         if (item->item_type == MULTICAST_TYPE)
         {
             multicast_type* method =  (multicast_type*)item;
-            if (!domain.compare(method->domain.data) || ((!domain.compare("")) && (!strcmp(method->domain.data, "multicast"))))
+            if (!domain.compare(method->domain.data))
             {
                 fprintf(outputfd, "%s", gather_comments(method->comments_token->extra).c_str());
                 fprintf(outputfd, "    virtual ");
@@ -461,17 +472,19 @@ static void generate_enum_define(std::string include_str, document_item_type* ai
 
     fprintf(outputfd, "#ifndef __%s_SERVICE_DEFINES_H__\n", this_interface);
     fprintf(outputfd, "#define __%s_SERVICE_DEFINES_H__\n", this_interface);
-    fprintf(outputfd, "namespace goni {\n");
+    fprintf(outputfd, "namespace goni {\n\n");
     while (aitem)
     {
         if (aitem->item_type == ENUM_DATA_TYPE)
         {
             enum_data_type* method = (enum_data_type*)aitem;
-            fprintf(outputfd, "enum %s {\n", method->name.data);
+            fprintf(outputfd, "%s", gather_comments(method->comments_token->extra, false).c_str());
+            fprintf(outputfd, "enum %s \n{\n", method->name.data);
             enum_list* el = method->enumm_list;
             while (el)
             {
-                fprintf(outputfd, "\t%s,\n", el->buffer.data);
+                fprintf(outputfd, "%s", gather_comments(el->buffer.extra).c_str());
+                fprintf(outputfd, "    %s,\n", el->buffer.data);
                 el = el->next;
             }
             fprintf(outputfd, "};\n\n");
@@ -493,11 +506,11 @@ static void generate_replier_source_file(FILE* outputfd, interface_item_type* ai
     
     fprintf(outputfd, "#include \"%s.h\"\n", class_name);
     fprintf(outputfd, "#include \"binder/Parcel.h\"\n");
-    fprintf(outputfd, "#include \"%sService.h\"\n", this_interface);
+    fprintf(outputfd, "#include \"servicebase/ServiceBase.h\"\n");
     fprintf(outputfd, "#include \"%sStubBase.h\"\n\n", this_interface);
     fprintf(outputfd, "namespace goni {\n\n");
 
-    fprintf(outputfd, "%s::%s(%sService* owner)\n    :m_owner(owner)\n{\n}\n", class_name, class_name, this_interface);
+    fprintf(outputfd, "%s::%s(ServiceBase* owner)\n    :m_owner(owner)\n{\n}\n", class_name, class_name);
     fprintf(outputfd, "%s::~%s() {}\n\n", class_name, class_name);
 
     interface_item_type* item = aitem;
@@ -547,8 +560,8 @@ static void generate_replier_header_file(FILE* outputfd, interface_item_type* ai
     fprintf(outputfd, "%s", include_user.c_str());
 
     fprintf(outputfd, "namespace goni {\n\n");
-    fprintf(outputfd, "class %sService;\n\n", this_interface);
-    fprintf(outputfd, "class %s\n{\npublic:\n    %s(%sService* owner);\n    ~%s();\n\n", class_name, class_name, this_interface, class_name);
+    fprintf(outputfd, "class ServiceBase;\n\n");
+    fprintf(outputfd, "class %s\n{\npublic:\n    %s(ServiceBase* owner);\n    ~%s();\n\n", class_name, class_name, class_name);
 
     interface_item_type* item = aitem;
     while (item)
@@ -566,7 +579,7 @@ static void generate_replier_header_file(FILE* outputfd, interface_item_type* ai
         item = item->next;
     }
 
-    fprintf(outputfd, "\nprivate:\n    %sService* m_owner;\n};\n}\n#endif\n/* EOF */", this_interface);
+    fprintf(outputfd, "\nprivate:\n    ServiceBase* m_owner;\n};\n}\n#endif\n/* EOF */");
 }
 
 
@@ -581,18 +594,17 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
     fprintf(outputfd, "#include \"servicebase/ServiceBase.h\"\n\n");
     fprintf(outputfd, "namespace goni {\n\n");
 
-    fprintf(outputfd, "%s::%s(ServiceBase* owner)\n    : StubBase(owner)\n    , m_name(\"%s\")\n{\n", class_name, class_name, this_interface);
-    if (multicast_code_count > 0) 
-    {
-        fprintf(outputfd, "    m_owner->createPublisher(m_name.c_str());\n");
-    }
+    fprintf(outputfd, "%s::%s(ServiceBase* owner)\n    : StubBase(owner)\n{\n", class_name, class_name);
+    std::vector<std::string>::iterator it = multicast_domain.begin();
+    for (; it != multicast_domain.end(); it++)
+        fprintf(outputfd, "    m_owner->createPublisher(\"%s\");\n", it->c_str());
+
     fprintf(outputfd, "}\n\n");
 
     fprintf(outputfd, "%s::~%s()\n{\n", class_name, class_name);
-    if (multicast_code_count > 0) 
-    {
-        fprintf(outputfd, "    m_owner->destroyPublisher(m_name.c_str());\n");
-    }
+    it = multicast_domain.begin();
+    for (; it != multicast_domain.end(); it++)
+        fprintf(outputfd, "    m_owner->destroyPublisher(\"%s\");\n", it->c_str());
     fprintf(outputfd, "}\n\n");
 
 
@@ -623,7 +635,7 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
                         fprintf(outputfd, "        ");
                         fprintf(outputfd, bt->declare().c_str());
                     }
-                        
+
                     sprintf(arg_buf + strlen(arg_buf), "%s, ", arg->name.data);
 
                     arg = arg->next;
@@ -656,7 +668,7 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
     }
 
     fprintf(outputfd, "    }\n\n    return 0;\n}\n");
-    
+
     fprintf(outputfd, "int %s::onAsyncRequest(SenderId &id, unsigned int code, const android::Parcel &data)\n{\n", class_name);
     fprintf(outputfd, "    switch (code) {\n");
 
@@ -699,7 +711,7 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
     }
 
     fprintf(outputfd, "    }\n\n    return 0;\n}\n");
-            
+
     item = aitem;
     while (item)
     {
@@ -709,7 +721,7 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
             make_method_name(outputfd, method->name.data, make_void_type(), method->args, false, class_name);
             fprintf(outputfd, "\n{\n    android::Parcel _data;\n");
             fprintf(outputfd, "    _data.writeCString(\"%s\");\n", this_interface);
-            fprintf(outputfd, "    _data.writeCString(m_name.data());\n");
+            fprintf(outputfd, "    _data.writeCString(\"%s\");\n", method->domain.data);
             arg_type* arg = method->args;
             while (arg)
             {
@@ -720,13 +732,13 @@ static void generate_stub_source_file(FILE* outputfd, interface_item_type* aitem
                 arg = arg->next;
             }
 
-            fprintf(outputfd, "\n    return m_owner->sendMulticast(m_name.c_str(), MULTICAST_%s, _data);\n}\n", makeup(method->name.data).c_str());
+            fprintf(outputfd, "\n    return m_owner->sendMulticast(\"%s\", MULTICAST_%s, _data);\n}\n",method->domain.data, makeup(method->name.data).c_str());
 
         }
 
         item = item->next;
     }
-            
+
     fprintf(outputfd, "}\n/* EOF */");
 }
 
@@ -780,7 +792,13 @@ static void generate_stub_header_file(FILE* outputfd, interface_item_type* aitem
                 fprintf(outputfd, " = 0;\n");
             }
         }
-        else if (item->item_type == MULTICAST_TYPE) 
+        item = item->next;
+    }
+    fprintf(outputfd, "\npublic:\n");
+    item = aitem;
+    while (item)
+    {
+        if (item->item_type == MULTICAST_TYPE) 
         {
             multicast_type* method =  (multicast_type*)item;
             fprintf(outputfd, "    ");
@@ -789,8 +807,6 @@ static void generate_stub_header_file(FILE* outputfd, interface_item_type* aitem
         }
         item = item->next;
     }
-
-    fprintf(outputfd, "\nprivate:\n    std::string m_name;\n");
 
     fprintf(outputfd, "};\n}\n#endif\n/* EOF */");
 }
@@ -802,7 +818,7 @@ static void generate_proxy_source_file(FILE *outputfd, interface_item_type* aite
     bzero(class_name, sizeof(class_name));
     sprintf(class_name, "%sProxyBase", this_interface);
 
-    fprintf(outputfd, "#include \"%s.h\"\n", class_name);
+    fprintf(outputfd, "#include \"proxy/%s.h\"\n", class_name);
     fprintf(outputfd, "#include \"binder/Parcel.h\"\n\n");
     fprintf(outputfd, "namespace goni {\n\n");
     fprintf(outputfd, "%s::%s(%sProxyReplier* replier)\n    :ServiceProxyBase(\"%s\")\n    ,m_replier(replier)\n{\n",
@@ -1150,15 +1166,31 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
         mkdir(include_str.c_str(), 0777);
     }
 
-    string proxy_str = filename + "/proxy/";
-    string stub_str = filename + "/stub/";
+    string src_str = filename + "/src/";
+    if (access(src_str.c_str(), F_OK) != 0) {
+        mkdir(src_str.c_str(), 0777);
+    }
 
-    if (access(proxy_str.c_str(), F_OK) != 0) {
-        mkdir(proxy_str.c_str(), 0777);
+    string proxy_inc_str = include_str + "/proxy/";
+    string stub_inc_str = src_str + "/stub/";
+    
+    string proxy_src_str = src_str + "/proxy/";
+    string stub_src_str = src_str + "/stub/";
+
+    if (access(proxy_inc_str.c_str(), F_OK) != 0) {
+        mkdir(proxy_inc_str.c_str(), 0777);
     }
     
-    if (access(stub_str.c_str(), F_OK) != 0) {
-        mkdir(stub_str.c_str(), 0777);
+    if (access(proxy_src_str.c_str(), F_OK) != 0) {
+        mkdir(proxy_src_str.c_str(), 0777);
+    }
+    
+    if (access(stub_inc_str.c_str(), F_OK) != 0) {
+        mkdir(stub_inc_str.c_str(), 0777);
+    }
+    
+    if (access(stub_src_str.c_str(), F_OK) != 0) {
+        mkdir(stub_src_str.c_str(), 0777);
     }
 
     init_user_data(docus);
@@ -1180,11 +1212,11 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
             sprintf(tmp_file_name, "%sProxyBase", this_interface);
             std::string file_name(tmp_file_name, strlen(tmp_file_name));
 
-            FILE* outputfd = newfile(proxy_str.c_str(), file_name, ".h", originalSrc);
+            FILE* outputfd = newfile(proxy_inc_str.c_str(), file_name, ".h", originalSrc);
             generate_proxy_header_file(outputfd, iface->interface_items);
             fclose(outputfd);
 
-            outputfd = newfile(proxy_str.c_str(), file_name, ".cpp", originalSrc);
+            outputfd = newfile(proxy_src_str.c_str(), file_name, ".cpp", originalSrc);
             generate_proxy_source_file(outputfd, iface->interface_items);
             fclose(outputfd);
 
@@ -1192,11 +1224,11 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
             sprintf(tmp_file_name, "%sStubBase", this_interface);
             file_name = std::string(tmp_file_name, strlen(tmp_file_name));
 
-            outputfd = newfile(stub_str.c_str(), file_name, ".h", originalSrc);
+            outputfd = newfile(stub_inc_str.c_str(), file_name, ".h", originalSrc);
             generate_stub_header_file(outputfd, iface->interface_items);
             fclose(outputfd);
 
-            outputfd = newfile(stub_str.c_str(), file_name, ".cpp", originalSrc);
+            outputfd = newfile(stub_src_str.c_str(), file_name, ".cpp", originalSrc);
             generate_stub_source_file(outputfd, iface->interface_items);
             fclose(outputfd);
 
@@ -1204,41 +1236,42 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
             sprintf(tmp_file_name, "%sReplier", this_interface);
             file_name = std::string(tmp_file_name, strlen(tmp_file_name));
 
-            outputfd = newfile(stub_str.c_str(), file_name, ".h", originalSrc);
+            outputfd = newfile(stub_inc_str.c_str(), file_name, ".h", originalSrc);
             generate_replier_header_file(outputfd, iface->interface_items);
             fclose(outputfd);
 
-            outputfd = newfile(stub_str.c_str(), file_name, ".cpp", originalSrc);
+            outputfd = newfile(stub_src_str.c_str(), file_name, ".cpp", originalSrc);
             generate_replier_source_file(outputfd, iface->interface_items);
             fclose(outputfd);
 
             if (multicast_code_count > 0)
             {
-                string sub_str = filename + "/sub/";
-                if (access(sub_str.c_str(), F_OK) != 0) {
-                    mkdir(sub_str.c_str(), 0777);
+                string sub_inc_str = include_str + "/sub/";
+                if (access(sub_inc_str.c_str(), F_OK) != 0) {
+                    mkdir(sub_inc_str.c_str(), 0777);
+                }
+                
+                string sub_src_str = src_str + "/sub/";
+                if (access(sub_src_str.c_str(), F_OK) != 0) {
+                    mkdir(sub_src_str.c_str(), 0777);
                 }
 
                 std::vector<std::string>::iterator it = multicast_domain.begin();
                 for (; it != multicast_domain.end(); it++)
                 {
-
-                    std::string mulName(*it);
-                    if (!it->compare("multicast"))
-                    {
-                        mulName = std::string("");
-                    }
-
                     bzero(tmp_file_name, sizeof(tmp_file_name));
-                    sprintf(tmp_file_name, "%sSub%s", this_interface, makefirstup(mulName).c_str());
+                    if (it->compare("multicast"))
+                        sprintf(tmp_file_name, "%sSub%s", this_interface, makefirstup(*it).c_str());
+                    else
+                        sprintf(tmp_file_name, "%sSub", this_interface);
                     file_name = std::string(tmp_file_name, strlen(tmp_file_name));
 
-                    outputfd = newfile(sub_str.c_str(), file_name, ".h", originalSrc);
-                    generate_sub_header_file(outputfd, iface->interface_items, mulName);
+                    outputfd = newfile(sub_inc_str.c_str(), file_name, ".h", originalSrc);
+                    generate_sub_header_file(outputfd, iface->interface_items, *it);
                     fclose(outputfd);
 
-                    outputfd = newfile(sub_str.c_str(), file_name, ".cpp", originalSrc);
-                    generate_sub_source_file(outputfd, iface->interface_items, mulName);
+                    outputfd = newfile(sub_src_str.c_str(), file_name, ".cpp", originalSrc);
+                    generate_sub_source_file(outputfd, iface->interface_items, *it);
                     fclose(outputfd);
                 }
             }

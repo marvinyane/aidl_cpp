@@ -201,6 +201,8 @@ public:
 
             tmp.append("{\n");
             tmp.append("int _len = data.readInt32();\n");
+            tmp.append(m_name);
+            tmp.append(".clear();\n");
             tmp.append("for (int i = 0; i < _len; i++) {\n");
             tmp.append(m_localType);
             tmp.append(" _tmp = data.");
@@ -662,6 +664,8 @@ public:
         if (m_array) {
             tmp.append("{\n");
             tmp.append("int _len = data.readInt32();\n");
+            tmp.append(m_name);
+            tmp.append(".clear();\n");
             tmp.append("for (int i = 0; i < _len; i++) {\n");
             m_array = false;
             tmp.append(declare("_tmp"));
