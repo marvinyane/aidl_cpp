@@ -115,7 +115,7 @@ compile_aidl(Options& options)
         return 1;
     }
 
-    err = generate_cpp(options.outputBaseFolder, options.inputFileName.c_str(), mainDoc);
+    err = generate_cpp(options.outputBaseFolder, options.inputFileName.c_str(), mainDoc, options.virtualFunc, options.replierBase);
 
     return err;
 }

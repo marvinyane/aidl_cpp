@@ -13,6 +13,7 @@ static int count_brackets(const char*);
 %}
 
 %token IDENTIFIER
+%token NUMERIC
 %token GENERIC
 %token ARRAY
 %token PARCELABLE
@@ -205,18 +206,16 @@ enum_decl:
         ;
 
 enum_list:
-        IDENTIFIER                                  {
+        enum_items                                  {
                                                         enum_list* enums =  (enum_list*)malloc(sizeof(enum_list));
-                                                        memset(&enums->comma_token, 0, sizeof(buffer_type));
-                                                        enums->buffer = $1.buffer;
+                                                        enums->item = $1.enum_value;
                                                         enums->next = NULL;
                                                         $$.enumm_list = enums;
                                                     }
-    |   enum_list ',' IDENTIFIER                    {
+    |   enum_list ',' enum_items                    {
                                                         if ($$.enumm_list != NULL) {
                                                             enum_list* enums =  (enum_list*)malloc(sizeof(enum_list));
-                                                            memset(&enums->comma_token, 0, sizeof(buffer_type));
-                                                            enums->buffer = $3.buffer;
+                                                            enums->item = $3.enum_value;
                                                             enums->next = NULL;
                                                             enum_list *p = $1.enumm_list;
                                                             while (p && p->next) {
@@ -226,10 +225,43 @@ enum_list:
                                                         }
                                                     }
     |   error                   {
-                                    fprintf(stderr, "%s:%d: syntax error in enum list\n", g_currentFilename, $1.buffer.lineno);
+                                    fprintf(stderr, "%s:%d: syntax error in enum list %s\n", g_currentFilename, $1.buffer.lineno, $1.buffer.data);
                                     $$.arg = NULL;
                                 }
     ;
+
+
+enum_items:
+        IDENTIFIER                                {
+                                                            enum_item_t* et = (enum_item_t*)malloc(sizeof(enum_item_t));
+                                                            et->name = $1.buffer;
+                                                            et->has_value = false;
+                                                            et->comma_token = &et->name;
+                                                            $$.enum_value = et;
+                                                  }
+    |   IDENTIFIER '=' IDENTIFIER                {
+                                                            enum_item_t* et = (enum_item_t*)malloc(sizeof(enum_item_t));
+                                                            et->name = $1.buffer;
+                                                            et->value = $3.buffer;
+                                                            et->has_value = true;
+                                                            et->comma_token = &et->name;
+                                                            $$.enum_value = et;
+                                                  }
+    |   IDENTIFIER '=' NUMERIC                    {
+                                                            enum_item_t* et = (enum_item_t*)malloc(sizeof(enum_item_t));
+                                                            et->name = $1.buffer;
+                                                            et->value = $3.buffer;
+                                                            et->has_value = true;
+                                                            et->comma_token = &et->name;
+                                                            $$.enum_value = et;
+                                                  }
+
+    |   error                   {
+                                    fprintf(stderr, "%s:%d: syntax error in enum item\n", g_currentFilename, $1.buffer.lineno);
+                                    $$.arg = NULL;
+                                }
+    ;
+
 
 command_decl:
         direction IDENTIFIER '(' arg_list ')' ';' {

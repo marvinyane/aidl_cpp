@@ -18,6 +18,8 @@ struct Options
     bool failOnParcelable;
     string inputFileName;
     string outputBaseFolder;
+    bool  virtualFunc;
+    bool  replierBase;
 };
 
 // takes the inputs from the command line and fills in the Options struct

@@ -410,7 +410,7 @@ static void generate_sub_source_file(FILE* outputfd, interface_item_type* aitem,
     fprintf(outputfd, "    }\n\n    return 0;\n}\n}\n/* EOF */");
 }
 
-static void generate_sub_header_file(FILE* outputfd, interface_item_type* aitem, std::string domain)
+static void generate_sub_header_file(FILE* outputfd, interface_item_type* aitem, std::string domain, bool vf)
 {
     char class_name[100];
     bzero(class_name, sizeof(class_name));
@@ -444,7 +444,14 @@ static void generate_sub_header_file(FILE* outputfd, interface_item_type* aitem,
                 fprintf(outputfd, "%s", gather_comments(method->comments_token->extra).c_str());
                 fprintf(outputfd, "    virtual ");
                 make_method_name(outputfd, method->name.data, make_void_type(), method->args, false, NULL);
-                fprintf(outputfd, " = 0;\n");
+                if (vf) 
+                {
+                    fprintf(outputfd, " { return 0; }\n");
+                }
+                else 
+                {
+                    fprintf(outputfd, " = 0;\n");
+                }
             }
         }
         item = item->next;
@@ -483,8 +490,13 @@ static void generate_enum_define(std::string include_str, document_item_type* ai
             enum_list* el = method->enumm_list;
             while (el)
             {
-                fprintf(outputfd, "%s", gather_comments(el->buffer.extra).c_str());
-                fprintf(outputfd, "    %s,\n", el->buffer.data);
+                fprintf(outputfd, "%s", gather_comments(el->item->comma_token->extra).c_str());
+                fprintf(outputfd, "    %s", el->item->name.data);
+                if (el->item->has_value) 
+                    fprintf(outputfd, "= %s,\n", el->item->value.data);
+                else
+                    fprintf(outputfd, ",\n");
+
                 el = el->next;
             }
             fprintf(outputfd, "};\n\n");
@@ -498,11 +510,19 @@ static void generate_enum_define(std::string include_str, document_item_type* ai
     fclose(outputfd);
 }
 
-static void generate_replier_source_file(FILE* outputfd, interface_item_type* aitem)
+static void generate_replier_source_file(FILE* outputfd, interface_item_type* aitem, bool replierBase)
 {
     char class_name[100];
     bzero(class_name, sizeof(class_name));
-    sprintf(class_name, "%sReplier", this_interface);
+    if(replierBase)
+    {
+        sprintf(class_name, "%sReplierBase", this_interface);
+    }
+    else
+    {
+        sprintf(class_name, "%sReplier", this_interface);
+    }
+
     
     fprintf(outputfd, "#include \"%s.h\"\n", class_name);
     fprintf(outputfd, "#include \"binder/Parcel.h\"\n");
@@ -545,11 +565,19 @@ static void generate_replier_source_file(FILE* outputfd, interface_item_type* ai
 
 }
 
-static void generate_replier_header_file(FILE* outputfd, interface_item_type* aitem)
+static void generate_replier_header_file(FILE* outputfd, interface_item_type* aitem, bool replierBase)
 {
     char class_name[100];
     bzero(class_name, sizeof(class_name));
-    sprintf(class_name, "%sReplier", this_interface);
+    if(replierBase)
+    {
+        sprintf(class_name, "%sReplierBase", this_interface);
+    }
+    else
+    {
+        sprintf(class_name, "%sReplier", this_interface);
+    }
+
     
     fprintf(outputfd, "#ifndef __%s_H__\n"\
             "#define __%s_H__\n\n", makeup(class_name).c_str(), makeup(class_name).c_str());
@@ -823,9 +851,20 @@ static void generate_proxy_source_file(FILE *outputfd, interface_item_type* aite
     fprintf(outputfd, "namespace goni {\n\n");
     fprintf(outputfd, "%s::%s(%sProxyReplier* replier)\n    :ServiceProxyBase(\"%s\")\n    ,m_replier(replier)\n{\n",
             class_name, class_name, this_proxy_interface, this_interface);
-    fprintf(outputfd, "    setupAsyncRequest();\n}\n");
+    if (notify_code_count > 0) 
+    {
+        fprintf(outputfd, "    setupAsyncRequest();\n}\n");
+        fprintf(outputfd, "%s::~%s()\n{\n    teardownAsyncRequest();\n}\n", class_name, class_name);
+    }
+    else 
+    {
+        fprintf(outputfd, "}\n");
+        fprintf(outputfd, "%s::~%s()\n{\n}\n", class_name, class_name);
+    }
 
-    fprintf(outputfd, "%s::~%s()\n{\n    teardownAsyncRequest();\n}\n", class_name, class_name);
+    
+    fprintf(outputfd, "void %s::onConnected()\n{\n    ServiceProxyBase::onConnected();\n    m_replier->onConnected();\n}\n", class_name);
+    fprintf(outputfd, "void %s::onDisconnected()\n{\n    ServiceProxyBase::onDisconnected();\n    m_replier->onDisconnected();\n}\n\n", class_name);
     
     interface_item_type* item = aitem;
     while (item)
@@ -928,7 +967,7 @@ static void generate_proxy_source_file(FILE *outputfd, interface_item_type* aite
     fprintf(outputfd, "}\n/* EOF */");
 }
 
-static void generate_proxy_header_file(FILE *outputfd, interface_item_type* aitem)
+static void generate_proxy_header_file(FILE *outputfd, interface_item_type* aitem, bool vf)
 {
     int i;
     interface_item_type* item = aitem;
@@ -944,6 +983,8 @@ static void generate_proxy_header_file(FILE *outputfd, interface_item_type* aite
     fprintf(outputfd, "namespace goni {\n\n");
     fprintf(outputfd, "class %sProxyReplier\n{\npublic:\n", this_proxy_interface);
     fprintf(outputfd, "    virtual ~%sProxyReplier() {}\n\n", this_proxy_interface);
+    fprintf(outputfd, "    virtual void onConnected() {}\n\n");
+    fprintf(outputfd, "    virtual void onDisconnected() {}\n\n");
 
     while (item) 
     {
@@ -954,7 +995,14 @@ static void generate_proxy_header_file(FILE *outputfd, interface_item_type* aite
                 fprintf(outputfd, "%s", gather_comments(method->comments_token->extra).c_str());
                 fprintf(outputfd, "    virtual ");
                 make_method_name(outputfd, method->name.data, make_void_type(), method->args, false, NULL);
-                fprintf(outputfd, " = 0;\n");
+                if (vf) 
+                {
+                    fprintf(outputfd, " { return 0; }\n");
+                }
+                else 
+                {
+                    fprintf(outputfd, " = 0;\n");
+                }
             }
         }
 
@@ -968,6 +1016,8 @@ static void generate_proxy_header_file(FILE *outputfd, interface_item_type* aite
     fprintf(outputfd, "public:\n");
     fprintf(outputfd, "    %sProxyBase(%sProxyReplier* replier);\n", this_interface, this_proxy_interface);
     fprintf(outputfd, "    ~%sProxyBase();\n\n", this_interface);
+    fprintf(outputfd, "    virtual void onConnected();\n");
+    fprintf(outputfd, "    virtual void onDisconnected();\n\n");
 
     item = aitem;
     while (item)
@@ -1028,15 +1078,15 @@ static void generate_user_data(user_data_type* p, const string& inc_str)
 
     arg_type* arg = p->args;
 
-    char write_buf[1024];
-    char read_buf[1024];
-    char init_buf[1024];
-    char inc_buf[1024];
+    char *write_buf = (char*)malloc(102400);
+    char *read_buf = (char*)malloc(102400);
+    char *init_buf = (char*)malloc(10240);
+    char *inc_buf = (char*)malloc(10240);
 
-    bzero(write_buf, sizeof write_buf);
-    bzero(read_buf, sizeof read_buf);
-    bzero(init_buf, sizeof init_buf);
-    bzero(inc_buf, sizeof inc_buf);
+    bzero(write_buf, 102400);
+    bzero(read_buf, 102400);
+    bzero(init_buf, 10240);
+    bzero(inc_buf, 10240);
 
 
     while (arg) {
@@ -1093,7 +1143,11 @@ static void generate_user_data(user_data_type* p, const string& inc_str)
         arg = arg->next;
     }
 
-    fprintf(outputfd, "\n};\n}\n#endif");
+    fprintf(outputfd, "\n};\n");
+    fprintf(outputfd, "typedef android::sp<%s> %s_Sp;\n", p->name.data, p->name.data);
+    fprintf(outputfd, "typedef std::vector<android::sp<%s> > %s_SpVec;\n", p->name.data, p->name.data);
+    fprintf(outputfd,"\n}\n#endif");
+
     fclose(outputfd);
 }
 
@@ -1151,7 +1205,7 @@ void init_interface_name(document_item_type* docus)
 
 // =================================================
 int
-generate_cpp(const string& filename, const string& originalSrc, document_item_type* docus)
+generate_cpp(const string& filename, const string& originalSrc, document_item_type* docus, bool virtualFunc, bool replierBase)
 {
     if (filename == "-") {
         printf("[%s:%d] stdout not supported!!\n", __FUNCTION__, __LINE__);
@@ -1213,7 +1267,7 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
             std::string file_name(tmp_file_name, strlen(tmp_file_name));
 
             FILE* outputfd = newfile(proxy_inc_str.c_str(), file_name, ".h", originalSrc);
-            generate_proxy_header_file(outputfd, iface->interface_items);
+            generate_proxy_header_file(outputfd, iface->interface_items, virtualFunc);
             fclose(outputfd);
 
             outputfd = newfile(proxy_src_str.c_str(), file_name, ".cpp", originalSrc);
@@ -1233,15 +1287,23 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
             fclose(outputfd);
 
             bzero(tmp_file_name, sizeof(tmp_file_name));
-            sprintf(tmp_file_name, "%sReplier", this_interface);
+            if(replierBase)
+            {
+                sprintf(tmp_file_name, "%sReplierBase", this_interface);
+            }
+            else
+            {
+                sprintf(tmp_file_name, "%sReplier", this_interface);
+            }
+
             file_name = std::string(tmp_file_name, strlen(tmp_file_name));
 
             outputfd = newfile(stub_inc_str.c_str(), file_name, ".h", originalSrc);
-            generate_replier_header_file(outputfd, iface->interface_items);
+            generate_replier_header_file(outputfd, iface->interface_items, replierBase);
             fclose(outputfd);
 
             outputfd = newfile(stub_src_str.c_str(), file_name, ".cpp", originalSrc);
-            generate_replier_source_file(outputfd, iface->interface_items);
+            generate_replier_source_file(outputfd, iface->interface_items, replierBase);
             fclose(outputfd);
 
             if (multicast_code_count > 0)
@@ -1267,7 +1329,7 @@ generate_cpp(const string& filename, const string& originalSrc, document_item_ty
                     file_name = std::string(tmp_file_name, strlen(tmp_file_name));
 
                     outputfd = newfile(sub_inc_str.c_str(), file_name, ".h", originalSrc);
-                    generate_sub_header_file(outputfd, iface->interface_items, *it);
+                    generate_sub_header_file(outputfd, iface->interface_items, *it, virtualFunc);
                     fclose(outputfd);
 
                     outputfd = newfile(sub_src_str.c_str(), file_name, ".cpp", originalSrc);

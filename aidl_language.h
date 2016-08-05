@@ -25,10 +25,17 @@ typedef struct buffer_type {
     extra_text_type* extra;
 } buffer_type;
 
+typedef struct enum_item_t
+{
+    buffer_type* comma_token;
+    buffer_type name;
+    bool        has_value;
+    buffer_type value;
+};
+
 typedef struct enum_list
 {
-    buffer_type comma_token;
-    buffer_type buffer;
+    enum_item_t*    item;
     struct enum_list* next;
 };
 
@@ -172,6 +179,7 @@ typedef union lexer_type {
     command_type* command;
     enum_data_type* enum_item;
     enum_list* enumm_list;
+    enum_item_t* enum_value;
     interface_item_type* interface_item;
     interface_type* interface_obj;
     user_data_type* user_data;

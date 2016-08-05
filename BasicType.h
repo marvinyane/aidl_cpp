@@ -201,6 +201,298 @@ public:
 
             tmp.append("{\n");
             tmp.append("int _len = data.readInt32();\n");
+            tmp.append(m_localType);
+            tmp.append("* _tmp_data = (");
+            tmp.append(m_localType);
+            tmp.append("*)malloc(_len * sizeof(");
+            tmp.append(m_localType);
+            tmp.append("));\n");
+            tmp.append("data.read(_tmp_data, _len*sizeof(");
+            tmp.append(m_localType);
+            tmp.append("));\n");
+            tmp.append(m_name);
+            tmp.append(" = ");
+            tmp.append(m_type);
+            tmp.append("(_tmp_data, _tmp_data+_len);\nfree(_tmp_data);\n}\n");
+        }
+        else {
+            if (decl)
+            {
+                tmp.append(m_type);
+                tmp.append(" ");
+            }
+            tmp.append(m_name);
+            tmp.append(" = data.");
+            tmp.append(m_readParcel);
+            tmp.append("();\n");
+        }
+    
+        return format(tmp, tab_size);
+    }
+
+    /*
+         * _data.writeInt32(a);
+         * {
+         * _data.writeInt32(a.length());
+         * std::vector<int>::iterator it = a.begin();
+         * for (; it != a.end(); it++) {
+         *     _data.readInt32(*it);
+         * }
+         * }
+         */
+    virtual std::string to(int tab_size, bool decl = false)
+    {
+        std::string tmp;
+        if (decl) 
+            tmp.append(declare());
+
+        if (m_array) {
+            tmp.append("_data.writeInt32(");
+            tmp.append(m_name);
+            tmp.append(".size());\n");
+            tmp.append("_data.write(&");
+            tmp.append(m_name);
+            tmp.append("[0], ");
+            tmp.append(m_name);
+            tmp.append(".size() * sizeof(");
+            tmp.append(m_localType);
+            tmp.append("));\n");
+        }
+        else {
+            tmp.append("_data.");
+            tmp.append(m_writeParcel);
+            tmp.append("(");
+            tmp.append(m_name);
+            tmp.append(");\n");
+        }
+
+        return format(tmp, tab_size);
+    }
+
+protected:
+    std::string m_name; // the name of args
+    std::string m_type; // the value write in source file
+    std::string m_localType;
+
+    std::string m_readParcel;
+    std::string m_writeParcel;
+
+    bool m_array;
+};
+
+class ByteType : public BasicType
+{
+public:
+    ByteType(std::string name, bool isArray = false)
+        : BasicType(name, "int8_t", isArray)
+    {
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
+    }
+
+    static std::string name()
+    {
+        return "int8";
+    }
+
+    ~ByteType() {}
+
+};
+
+class UByteType : public BasicType
+{
+public:
+    UByteType(std::string name, bool isArray = false)
+        : BasicType(name, "uint8_t", isArray)
+    {
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
+    }
+
+    static std::string name()
+    {
+        return "uint8";
+    }
+
+    ~UByteType() {}
+
+};
+
+class ShortType : public BasicType
+{
+public:
+    ShortType(std::string name, bool isArray = false)
+        : BasicType(name, "int16_t", isArray)
+    {
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
+    }
+
+    static std::string name()
+    {
+        return "int16";
+    }
+
+    ~ShortType() {}
+
+};
+
+class UShortType : public BasicType
+{
+public:
+    UShortType(std::string name, bool isArray = false)
+        : BasicType(name, "uint16_t", isArray)
+    {
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
+    }
+
+    static std::string name()
+    {
+        return "uint16";
+    }
+
+    ~UShortType() {}
+
+};
+
+
+class IntType : public BasicType
+{
+public:
+    IntType(std::string name, bool isArray = false)
+        : BasicType(name, "int32_t", isArray)
+    {
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
+    }
+
+    ~IntType() {}
+
+    static std::string name()
+    {
+        return "int";
+    }
+};
+
+class UIntType : public BasicType
+{
+public:
+    UIntType(std::string name, bool isArray = false)
+        : BasicType(name, "uint32_t", isArray)
+    {
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
+    }
+
+    ~UIntType() {}
+
+    static std::string name()
+    {
+        return "uint";
+    }
+};
+
+class Int64Type : public BasicType
+{
+public:
+    Int64Type(std::string name, bool isArray = false)
+        : BasicType(name, "int64_t", isArray)
+    {
+        m_readParcel = std::string("readInt64");
+        m_writeParcel = std::string("writeInt64");
+    }
+
+    ~Int64Type() {}
+
+    static std::string name()
+    {
+        return "int64";
+    }
+};
+
+class UInt64Type : public BasicType
+{
+public:
+    UInt64Type(std::string name, bool isArray = false)
+        : BasicType(name, "uint64_t", isArray)
+    {
+        m_readParcel = std::string("readInt64");
+        m_writeParcel = std::string("writeInt64");
+    }
+
+    ~UInt64Type() {}
+
+    static std::string name()
+    {
+        return "uint64";
+    }
+};
+
+
+class FloatType : public BasicType
+{
+public:
+    FloatType(std::string name, bool isArray = false)
+        : BasicType(name, "float", isArray)
+    {
+        m_readParcel = std::string("readFloat");
+        m_writeParcel = std::string("writeFloat");
+    }
+
+    ~FloatType() {}
+
+    static std::string name()
+    {
+        return "float";
+    }
+};
+
+class BoolType : public BasicType
+{
+public:
+    BoolType(std::string name, bool isArray = false)
+        : BasicType(name, "bool", isArray)
+    {
+        m_readParcel = std::string("readInt32");
+        m_writeParcel = std::string("writeInt32");
+    }
+
+    ~BoolType() {}
+
+    static std::string name()
+    {
+        return "bool";
+    }
+};
+
+class String8Type : public BasicType
+{
+public:
+    String8Type(std::string name, bool isArray = false)
+        : BasicType(name, "android::String8", isArray)
+    {
+        m_readParcel = "readString8";
+        m_writeParcel = "writeString8";
+    }
+
+    ~String8Type() {}
+
+    static std::string name()
+    {
+        return "string";
+    }
+
+    virtual std::string from(int tab_size, bool decl = true)
+    {
+        std::string tmp;
+
+        if (m_array) {
+            if (decl)
+                tmp.append(declare());
+
+            tmp.append("{\n");
+            tmp.append("int _len = data.readInt32();\n");
             tmp.append(m_name);
             tmp.append(".clear();\n");
             tmp.append("for (int i = 0; i < _len; i++) {\n");
@@ -263,144 +555,6 @@ public:
 
         return format(tmp, tab_size);
     }
-
-protected:
-    std::string m_name; // the name of args
-    std::string m_type; // the value write in source file
-    std::string m_localType;
-
-    std::string m_readParcel;
-    std::string m_writeParcel;
-
-    bool m_array;
-};
-
-class ByteType : public BasicType
-{
-public:
-    ByteType(std::string name, bool isArray = false)
-        : BasicType(name, "int8_t", isArray)
-    {
-        m_readParcel = std::string("readInt32");
-        m_writeParcel = std::string("writeInt32");
-    }
-
-    static std::string name()
-    {
-        return "int8";
-    }
-
-    ~ByteType() {}
-
-};
-
-class ShortType : public BasicType
-{
-public:
-    ShortType(std::string name, bool isArray = false)
-        : BasicType(name, "int16_t", isArray)
-    {
-        m_readParcel = std::string("readInt32");
-        m_writeParcel = std::string("writeInt32");
-    }
-
-    static std::string name()
-    {
-        return "int16";
-    }
-
-    ~ShortType() {}
-
-};
-
-class IntType : public BasicType
-{
-public:
-    IntType(std::string name, bool isArray = false)
-        : BasicType(name, "int32_t", isArray)
-    {
-        m_readParcel = std::string("readInt32");
-        m_writeParcel = std::string("writeInt32");
-    }
-
-    ~IntType() {}
-
-    static std::string name()
-    {
-        return "int";
-    }
-};
-
-class Int64Type : public BasicType
-{
-public:
-    Int64Type(std::string name, bool isArray = false)
-        : BasicType(name, "int64_t", isArray)
-    {
-        m_readParcel = std::string("readInt64");
-        m_writeParcel = std::string("writeInt64");
-    }
-
-    ~Int64Type() {}
-
-    static std::string name()
-    {
-        return "int64";
-    }
-};
-
-class FloatType : public BasicType
-{
-public:
-    FloatType(std::string name, bool isArray = false)
-        : BasicType(name, "float", isArray)
-    {
-        m_readParcel = std::string("readFloat");
-        m_writeParcel = std::string("writeFloat");
-    }
-
-    ~FloatType() {}
-
-    static std::string name()
-    {
-        return "float";
-    }
-};
-
-class BoolType : public BasicType
-{
-public:
-    BoolType(std::string name, bool isArray = false)
-        : BasicType(name, "bool", isArray)
-    {
-        m_readParcel = std::string("readInt32");
-        m_writeParcel = std::string("writeInt32");
-    }
-
-    ~BoolType() {}
-
-    static std::string name()
-    {
-        return "bool";
-    }
-};
-
-class String8Type : public BasicType
-{
-public:
-    String8Type(std::string name, bool isArray = false)
-        : BasicType(name, "android::String8", isArray)
-    {
-        m_readParcel = "readString8";
-        m_writeParcel = "writeString8";
-    }
-
-    ~String8Type() {}
-
-    static std::string name()
-    {
-        return "string";
-    }
 };
 
 class String16Type : public BasicType
@@ -418,6 +572,79 @@ public:
     static std::string name()
     {
         return "string16";
+    }
+    
+    virtual std::string from(int tab_size, bool decl = true)
+    {
+        std::string tmp;
+
+        if (m_array) {
+            if (decl)
+                tmp.append(declare());
+
+            tmp.append("{\n");
+            tmp.append("int _len = data.readInt32();\n");
+            tmp.append(m_name);
+            tmp.append(".clear();\n");
+            tmp.append("for (int i = 0; i < _len; i++) {\n");
+            tmp.append(m_localType);
+            tmp.append(" _tmp = data.");
+            tmp.append(m_readParcel);
+            tmp.append("();\n");
+            tmp.append(m_name);
+            tmp.append(".push_back(_tmp);\n}\n}\n");
+        }
+        else {
+            if (decl)
+            {
+                tmp.append(m_type);
+                tmp.append(" ");
+            }
+            tmp.append(m_name);
+            tmp.append(" = data.");
+            tmp.append(m_readParcel);
+            tmp.append("();\n");
+        }
+    
+        return format(tmp, tab_size);
+    }
+
+    /*
+         * _data.writeInt32(a);
+         * {
+         * _data.writeInt32(a.length());
+         * std::vector<int>::iterator it = a.begin();
+         * for (; it != a.end(); it++) {
+         *     _data.readInt32(*it);
+         * }
+         * }
+         */
+    virtual std::string to(int tab_size, bool decl = false)
+    {
+        std::string tmp;
+        if (decl) 
+            tmp.append(declare());
+
+        if (m_array) {
+            char tt[1024];
+            bzero(tt, sizeof tt);
+            sprintf(tt, "{\n_data.writeInt32(%s.size());\n"\
+                    "%s::const_iterator it = %s.begin();\n"\
+                    "for (; it != %s.end(); it++) {\n"\
+                    "_data.%s(*it);\n}\n}\n",
+                    m_name.c_str(), m_type.c_str(), m_name.c_str(), m_name.c_str(), m_writeParcel.c_str());
+
+            tmp.append(std::string(tt));
+        }
+        else {
+            tmp.append("_data.");
+            tmp.append(m_writeParcel);
+            tmp.append("(");
+            tmp.append(m_name);
+            tmp.append(");\n");
+        }
+
+        return format(tmp, tab_size);
     }
 };
 
@@ -474,14 +701,14 @@ public:
     UserType(std::string sign, std::string name, bool isArray = false)
         : BasicType(name, sign, isArray)
     {
-        m_spName = std::string("android::sp<");
+        //m_spName = std::string("android::sp<");
         m_spName.append(sign);
-        m_spName.append(">");
+        m_spName.append("_Sp");
         m_spName.append(" ");
 
-        m_vecSpName = std::string("std::vector<");
-        m_vecSpName.append(m_spName);
-        m_vecSpName.append(">");
+        //m_vecSpName = std::string("std::vector<");
+        m_vecSpName.append(sign);
+        m_vecSpName.append("_SpVec");
         m_vecSpName.append(" ");
     }
 
@@ -732,14 +959,26 @@ public:
         if (!ByteType::name().compare(type)) {
             return new ByteType(name, isArray);
         }
+        else if (!UByteType::name().compare(type)) {
+            return new UByteType(name, isArray);
+        }
         else if (!ShortType::name().compare(type)) {
             return new ShortType(name, isArray);
+        }
+        else if (!UShortType::name().compare(type)) {
+            return new UShortType(name, isArray);
         }
         else if (!IntType::name().compare(type)) {
             return new IntType(name, isArray);
         }
+        else if (!UIntType::name().compare(type)) {
+            return new UIntType(name, isArray);
+        }
         else if (!Int64Type::name().compare(type)) {
             return new Int64Type(name, isArray);
+        }
+        else if (!UInt64Type::name().compare(type)) {
+            return new UInt64Type(name, isArray);
         }
         else if (!FloatType::name().compare(type)) {
             return new FloatType(name, isArray);

@@ -6,7 +6,7 @@
 #include <string>
 
 int generate_cpp(const std::string& filename, const std::string& originalSrc,
-                document_item_type* iface);
+                document_item_type* iface, bool virtualFunc, bool replierBase);
 
 #endif // GENERATE_CPP_H
 

@@ -32,6 +32,8 @@ parse_options(int argc, const char* const* argv, Options *options)
 
     options->task = COMPILE_AIDL;
     options->failOnParcelable = false;
+    options->virtualFunc = false;
+    options->replierBase = false;
 
     // OPTIONS
     while (i < argc) {
@@ -46,6 +48,14 @@ parse_options(int argc, const char* const* argv, Options *options)
                         fprintf(stderr, "-o option (%d) requires a path.\n", i);
                         return usage();
                     }
+                }
+                else if (s[1] == 'v')
+                {
+                    options->virtualFunc = true;
+                }
+                else if (s[1] == 'b')
+                {
+                    options->replierBase = true;
                 }
                 else {
                     // s[1] is not known

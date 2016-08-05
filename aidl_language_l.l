@@ -33,6 +33,7 @@ static void do_package_statement(const char* importText);
 %x COPYING LONG_COMMENT
 
 identifier  [_a-zA-Z][_a-zA-Z0-9\.]*
+numeric     (0[xX])?[0-9a-fA-F]+
 whitespace  ([ \t\n\r]+)
 brackets    \[{whitespace}?\]
 
@@ -68,6 +69,7 @@ brackets    \[{whitespace}?\]
 \(              { SET_BUFFER('('); return '('; }
 \)              { SET_BUFFER(')'); return ')'; }
 ,               { SET_BUFFER(','); return ','; }
+=               { SET_BUFFER('='); return '='; }
 \*              { SET_BUFFER('*'); return '*'; }
 
     /* keywords */
@@ -86,6 +88,7 @@ enum            { SET_BUFFER(ENUM); return ENUM; }
 {brackets}+     { SET_BUFFER(ARRAY); return ARRAY; }
 
 {identifier}                                        { SET_BUFFER(IDENTIFIER); return IDENTIFIER; }
+{numeric}                                            { SET_BUFFER(NUMERIC); return NUMERIC; }
 {identifier}\<{whitespace}*{identifier}({whitespace}*,{whitespace}*{identifier})*{whitespace}*\>    {
                                                       SET_BUFFER(GENERIC); return GENERIC; }
 
